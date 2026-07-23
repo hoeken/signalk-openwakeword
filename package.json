@@ -1,0 +1,27 @@
+{
+  "name": "signalk-openwakeword",
+  "version": "0.0.1",
+  "description": "Wyoming openWakeWord wake word detection service for Signal K. Pre-release placeholder.",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "wyoming",
+    "openwakeword",
+    "wake-word",
+    "voice",
+    "marine"
+  ],
+  "author": "hoeken",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoeken/signalk-openwakeword.git"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
