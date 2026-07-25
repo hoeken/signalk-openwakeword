@@ -109,17 +109,17 @@ planned for v1.x; the manual drop works today.
 ## Development
 
 ```bash
-npm install --install-links   # copies the sibling signalk-wyoming for its test mock
+npm install
 npm run build                 # tsc → dist/
 npm test                      # typecheck + vitest (mock Wyoming server, fake container manager)
 npm run ci-lint               # eslint + prettier --check
 ```
 
 Tests never touch docker: the container manager is faked and the Wyoming
-endpoint is the scriptable `signalk-wyoming/mock` server. `signalk-wyoming`
-is a `file:../signalk-wyoming` devDependency until its first npm release,
-after which it flips to a semver range. Production code has no runtime
-dependency on it — the plugin embeds its own ~150-line `describe` client.
+endpoint is the scriptable `signalk-wyoming/mock` server (a devDependency
+on the [signalk-wyoming](https://github.com/hoeken/signalk-wyoming)
+package). Production code has no runtime dependency on it — the plugin
+embeds its own ~150-line `describe` client.
 
 ## License
 

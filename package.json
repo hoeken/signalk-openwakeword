@@ -68,7 +68,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.1",
-    "signalk-wyoming": "file:../signalk-wyoming",
+    "signalk-wyoming": "^0.1.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.58.0",
     "vitest": "^4.1.10"
