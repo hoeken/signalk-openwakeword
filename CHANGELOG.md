@@ -1,48 +1,59 @@
-# v0.1.0
+# Changelog
 
-Initial release. Wake word detection for Signal K boats: runs
-[rhasspy/wyoming-openwakeword](https://github.com/rhasspy/wyoming-openwakeword)
-as a managed container and exposes it as a Wyoming protocol service on your
-network, so voice satellites (cockpit Pis, the `signalk-wyoming` local
-satellite, Home Assistant, or any Wyoming client) can stream microphone audio
-to it and get "wake word heard" events back. Part of the
-[signalk-wyoming](https://github.com/hoeken/signalk-wyoming) voice family
-alongside `signalk-whisper` (speech to text) and `signalk-piper` (text to
-speech).
+## v0.2.0
 
-## Features
+Nothing to reconfigure — existing settings carry over unchanged. The plugin
+now depends on signalk-container-helper 0.2.1 or later, which is installed
+automatically with the update.
 
-- **Managed container lifecycle** — pulls and runs `rhasspy/wyoming-openwakeword`
-  pinned to a tested upstream release (currently `2.1.0`, overridable via
-  `imageTag`), with configurable memory cap (default `384m`) and restart
-  policy, via the [signalk-container](https://www.npmjs.com/package/signalk-container) plugin
-- **Fully offline** — all wake word models ship inside the ~90 MB image; no
-  model downloads at runtime, nothing to fetch at sea
-- **Wake word configuration** — `wakeWords` (default `okay_nabu`; built-ins
-  include `hey_jarvis`, `hey_mycroft`, `alexa`, `hey_rhasspy`) validated
-  against the running service, plus `threshold` and `triggerLevel` sensitivity
-  tuning and an optional `refractorySeconds` re-detection cooldown
-- **Custom wake words** — optionally mount the shared signalk-container data
-  directory and load your own openWakeWord `.tflite` models via
-  `--custom-model-dir`
-- **Protocol-native health checks** — the plugin reports `ready` only once the
-  service answers a Wyoming `describe` request; a periodic health loop raises
-  the `notifications.voice.openwakeword` alarm after three consecutive
-  failures and clears it on recovery
-- **Discovery and integration** — advertises itself via the `wyoming-service`
-  PropertyValues convention so the `signalk-wyoming` orchestrator finds it
-  automatically; standalone Wyoming clients can point straight at
-  `tcp://<boat-server>:10400`
-- **Status and update API** — `GET /api/status` for state introspection, and
-  `GET /api/update/check` / `POST /api/update/apply` (admin) for container
-  image updates
+- **New graphical configuration panel.** Server → Plugin Config →
+  openWakeWord is now a real panel instead of the bare settings form. You
+  can see at a glance whether the service and its container are running,
+  check for and apply image updates with one click, and pick the service
+  version from a dropdown of available releases. Wake words are now
+  checkboxes driven by the models the running service actually offers
+  (plus a field to add a custom one), and the panel warns you inline when
+  a selected wake word doesn't exist — catching the upstream `ok_nabu` →
+  `okay_nabu` rename trap — or when the service is open to the whole
+  network. On servers without custom-panel support you keep the plain
+  settings form, which works exactly as before.
+- **Pick a version before enabling.** The version dropdown works even
+  while the plugin is disabled, so you can choose the image version up
+  front. If Docker Hub is unreachable — say, offshore — the panel says so
+  instead of guessing; `auto` and explicit tags keep working regardless.
+
+## v0.1.0
+
+Initial release: openWakeWord wake word detection (Wyoming protocol) for
+Signal K. Runs the `rhasspy/wyoming-openwakeword` service in a container
+managed through signalk-container — the wake-word building block of the
+signalk-wyoming voice-assistant family, also usable as a standalone
+Wyoming wake word server (e.g. for Home Assistant or a
+`wyoming-satellite`).
+
+- **Hands-off service management.** The plugin starts a pinned, tested
+  release of the service (2.1.0), keeps it running, and caps it at 384 MB
+  of memory by default. With the default `imageTag: auto` you get newly
+  tested releases along with plugin updates; admins can also check for and
+  apply image updates on demand.
+- **Fully offline.** All wake word models ship inside the ~90 MB container
+  image — nothing downloads at runtime, nothing to fetch at sea.
+- **Your choice of wake words.** `okay_nabu` by default; built-ins include
+  `hey_jarvis`, `hey_mycroft`, `alexa`, and `hey_rhasspy`, validated
+  against the running service. Sensitivity is tunable with `threshold` and
+  `triggerLevel`, plus an optional `refractorySeconds` re-detection
+  cooldown for double-trigger cabins.
+- **Custom wake words.** Optionally load your own openWakeWord `.tflite`
+  models from the shared signalk-container data directory — teach the boat
+  its own name.
+- **Knows when it is really ready.** The service is not reported ready
+  until it actually answers a Wyoming request, and it is health-checked
+  every 30 seconds afterwards. Three consecutive failures raise the
+  `notifications.voice.openwakeword` alarm; recovery clears it
+  automatically.
+- **Plugs into the voice stack automatically.** The signalk-wyoming
+  orchestrator discovers it with no configuration; standalone Wyoming
+  clients can point straight at `tcp://<boat-server>:10400`.
 - **LAN-reachable by default** (`bind: 0.0.0.0`) so remote satellites can
   stream audio to it, with explicit security guidance in the README; set
-  `bind: 127.0.0.1` if every satellite runs on the server itself
-
-## Requirements
-
-- Signal K server ≥ 2.x on Node.js ≥ 24
-- The signalk-container plugin with a working podman or docker runtime
-- ~384 MB RAM headroom for the container
-- amd64 or arm64 (no armv7 — upstream stopped publishing it)
+  `bind: 127.0.0.1` if every satellite runs on the server itself.
