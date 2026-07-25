@@ -1,5 +1,7 @@
 # signalk-openwakeword
 
+> **Status: ALPHA** This SignalK Wyoming system is 100% vibecoded slop. I don't have the right hardware yet to test it, so I'm putting it out there for people to test in the meantime. It _should_ work. File issues for anything that doestn.
+
 Wake word detection for Signal K boats. This plugin runs
 [rhasspy/wyoming-openwakeword](https://github.com/rhasspy/wyoming-openwakeword)
 as a managed container and exposes it as a [Wyoming
