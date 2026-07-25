@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MockWyomingServer } from "signalk-wyoming/mock";
 import type { Plugin } from "@signalk/server-api";
 import createPlugin, {
@@ -119,13 +119,14 @@ describe("plugin factory", () => {
 });
 
 describe("registerWithRouter", () => {
-  it("registers update routes (admin) and a readonly status route", () => {
+  it("registers update routes (admin) and readonly status/versions routes", () => {
     plugin = createPlugin(createFakeApp(), FAST_TIMING);
     const { router, routes } = makeRouter();
     plugin.registerWithRouter(router);
     expect(findRoute(routes, "get", "/api/update/check").access).toBeNull();
     expect(findRoute(routes, "post", "/api/update/apply").access).toBeNull();
     expect(findRoute(routes, "get", "/api/status").access).toBe("readonly");
+    expect(findRoute(routes, "get", "/api/versions").access).toBe("readonly");
   });
 
   it("falls back to admin-only registration without router.access", () => {
@@ -136,17 +137,71 @@ describe("registerWithRouter", () => {
     expect(findRoute(routes, "get", "/api/status").access).toBeNull();
   });
 
-  it("guards every route with the running flag", async () => {
+  it("guards every route except /api/versions with the running flag", async () => {
     plugin = createPlugin(createFakeApp(), FAST_TIMING);
     const { router, routes } = makeRouter();
     plugin.registerWithRouter(router);
     for (const route of routes) {
+      // /api/versions is deliberately unguarded (see its test below).
+      if (route.path === "/api/versions") continue;
       const res = makeRes();
       await route.handler({}, res);
       expect(res.code).toBe(503);
       expect(res.body).toEqual({
         error: "signalk-openwakeword is not running",
       });
+    }
+  });
+
+  it("serves /api/versions (readonly, unguarded) with semver-sorted Docker Hub tags", async () => {
+    plugin = createPlugin(createFakeApp(), FAST_TIMING);
+    const { router, routes } = makeRouter();
+    plugin.registerWithRouter(router);
+
+    vi.stubGlobal("fetch", async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        results: [
+          { name: "latest" },
+          { name: "2.0.0" },
+          { name: "2.10.2" },
+          { name: "2.1.0" },
+          { name: "main" },
+          { name: 7 },
+        ],
+      }),
+    }));
+    try {
+      // The plugin was never started: the versions feed must answer while
+      // it is disabled so the config panel can populate its dropdown
+      // before the operator enables the plugin.
+      const res = makeRes();
+      await findRoute(routes, "get", "/api/versions").handler({}, res);
+      expect(res.code).toBe(200);
+      expect(res.body).toEqual({
+        versions: [{ tag: "2.10.2" }, { tag: "2.1.0" }, { tag: "2.0.0" }],
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("answers 502 from /api/versions when Docker Hub is unreachable", async () => {
+    plugin = createPlugin(createFakeApp(), FAST_TIMING);
+    const { router, routes } = makeRouter();
+    plugin.registerWithRouter(router);
+
+    vi.stubGlobal("fetch", async () => {
+      throw new Error("network down");
+    });
+    try {
+      const res = makeRes();
+      await findRoute(routes, "get", "/api/versions").handler({}, res);
+      expect(res.code).toBe(502);
+      expect(res.body).toEqual({ error: "network down" });
+    } finally {
+      vi.unstubAllGlobals();
     }
   });
 

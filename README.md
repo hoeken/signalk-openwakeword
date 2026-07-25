@@ -36,6 +36,14 @@ container.
 
 ## Configuration
 
+The plugin ships a graphical configuration panel (Server → Plugin Config →
+openWakeWord) with a live container status card, a one-click image update
+check/apply, a version dropdown fed by Docker Hub, wake word checkboxes
+driven by the models the running service actually advertises, and all the
+settings below — with inline warnings when a selected wake word is missing
+or the service is open to the network. On servers without custom-panel
+support you get a plain settings form with the same options.
+
 | Setting                      | Default          | Notes                                                                                                                                                                                                                                                                                                                                                                                        |
 | ---------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `wakeWords`                  | `["okay_nabu"]`  | Wake words your satellites use. Built-ins: `okay_nabu`, `hey_jarvis`, `hey_mycroft`, `alexa`, `hey_rhasspy`. **Not** passed to the container — Wyoming clients select models per connection (`Detect` event); this list is validated against the running service and shared with the orchestrator. ⚠️ upstream 2.0.0 renamed `ok_nabu` → `okay_nabu`; the old name silently matches nothing. |
@@ -79,7 +87,10 @@ Signal K required on the client side.
 - `GET /plugins/signalk-openwakeword/api/status` returns
   `{ status, uri, tag, containerState, lastHealth, info }` (readonly access).
   `GET /api/update/check` / `POST /api/update/apply` (admin) manage container
-  image updates.
+  image updates. `GET /api/versions` (readonly) lists the image's Docker Hub
+  release tags for the config panel's version dropdown — it answers even
+  while the plugin is disabled, so the dropdown populates before you enable
+  it.
 
 ## Security
 
@@ -112,7 +123,7 @@ planned for v1.x; the manual drop works today.
 
 ```bash
 npm install
-npm run build                 # tsc → dist/
+npm run build                 # tsc → dist/ + webpack → public/ (Admin UI config panel)
 npm test                      # typecheck + vitest (mock Wyoming server, fake container manager)
 npm run ci-lint               # eslint + prettier --check
 ```
@@ -122,6 +133,17 @@ endpoint is the scriptable `signalk-wyoming/mock` server (a devDependency
 on the [signalk-wyoming](https://github.com/hoeken/signalk-wyoming)
 package). Production code has no runtime dependency on it — the plugin
 embeds its own ~150-line `describe` client.
+
+The config panel (`src/configpanel/`) is assembled from the shared building
+blocks in
+[`signalk-container-helper/ui`](https://www.npmjs.com/package/signalk-container-helper)
+and built by `webpack.config.cjs` as a Module Federation remote at
+`public/remoteEntry.js`. Because this package is `"type": "module"`, the
+remote **must** be an ESM container (`output.module: true`,
+`library: { type: "module" }`) — a classic `var` remote fails at panel-open
+time with "Module is not available". The JSON schema in `src/config.ts`
+remains the fallback for servers without panel support — keep the two in
+sync when adding settings.
 
 ## License
 

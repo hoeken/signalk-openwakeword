@@ -1,4 +1,6 @@
-node_modules/
+# build output
 dist/
+public/
+node_modules/
 *.log
 .DS_Store

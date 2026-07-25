@@ -11,6 +11,7 @@ import {
   ManagedContainer,
   startSafely,
   errMsg,
+  fetchWithTimeout,
   type ResponseLike,
   type RouterLike,
 } from "signalk-container-helper";
@@ -41,6 +42,9 @@ export interface PluginApp extends ServiceApp {
 }
 
 type RouteHandler = (req: unknown, res: ResponseLike) => unknown;
+
+/** Docker Hub tag listing backing the config panel's version dropdown. */
+const TAGS_URL = `https://hub.docker.com/v2/repositories/${IMAGE}/tags/?page_size=25`;
 
 export interface PluginRouter extends RouterLike {
   /** Signal K ≥2.x permission registrar; feature-detected. */
@@ -178,6 +182,45 @@ export default function createPlugin(
           }
         }),
       );
+
+      // Version-dropdown feed for the config panel. Deliberately not
+      // guarded by the running flag: the operator picks a tag while the
+      // plugin is still disabled, and the route only reaches out on demand.
+      readonlyRouter.get("/api/versions", async (_req, res) => {
+        try {
+          const response = await fetchWithTimeout(TAGS_URL, {
+            timeoutMs: 10_000,
+          });
+          if (!response.ok) {
+            res
+              .status(502)
+              .json({ error: `Docker Hub answered HTTP ${response.status}` });
+            return;
+          }
+          const body = (await response.json()) as {
+            results?: { name?: unknown }[];
+          };
+          const versions = (Array.isArray(body.results) ? body.results : [])
+            .map((r) => (typeof r?.name === "string" ? r.name : ""))
+            .filter(isSemverTag)
+            .sort(compareSemverDesc)
+            .map((tag) => ({ tag }));
+          res.json({ versions });
+        } catch (err) {
+          res.status(502).json({ error: errMsg(err) });
+        }
+      });
     },
   };
+}
+
+/** Numeric-descending compare for the plain x.y.z tags isSemverTag admits. */
+function compareSemverDesc(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i += 1) {
+    const d = (pb[i] ?? 0) - (pa[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
 }
