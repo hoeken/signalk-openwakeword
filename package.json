@@ -1,7 +1,7 @@
 {
   "name": "signalk-openwakeword",
   "version": "0.2.0",
-  "description": "Wake word detection service for Signal K. Runs rhasspy/wyoming-openwakeword in a managed container.",
+  "description": "Wake word detection service for Signal K. Part of the signalk-wyoming voice assistant family.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -52,6 +52,11 @@
     "displayName": "openWakeWord (Wyoming)",
     "requires": [
       "signalk-container"
+    ],
+    "recommends": [
+      "signalk-wyoming",
+      "signalk-piper",
+      "signalk-whisper"
     ]
   },
   "engines": {
