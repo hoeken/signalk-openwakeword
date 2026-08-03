@@ -59,6 +59,50 @@ describe("convertOnnxToTflite", () => {
     expect(config.timeout).toBeGreaterThan(0);
   });
 
+  // A bind-mount source is interpreted by the HOST runtime, so when Signal K
+  // runs in a container the local path must be translated first — otherwise
+  // podman binds a path that does not exist on the host.
+  it("mounts the host path, not the local one, when they differ", async () => {
+    handle = installFakeManager({
+      resolveHostPath: async (p: string) => ({
+        source: p.replace("/home/node", "/home/dirk"),
+        subPath: "",
+      }),
+      runJob: async () =>
+        jobResult(['RESULT {"file": "a.tflite", "maxAbsDiff": 0}']),
+    });
+    await convertOnnxToTflite(
+      log,
+      "/home/node/.signalk/plugin-config-data/signalk-container/custom",
+      "a.onnx",
+    );
+    const config = handle.callsTo("runJob")[0]?.args[0] as {
+      outputs: Record<string, string>;
+    };
+    expect(config.outputs).toEqual({
+      "/work":
+        "/home/dirk/.signalk/plugin-config-data/signalk-container/custom",
+    });
+  });
+
+  it("joins a subPath returned by the host-path translation", async () => {
+    handle = installFakeManager({
+      resolveHostPath: async () => ({
+        source: "/mnt/volume",
+        subPath: "plugin-config-data/signalk-container/custom",
+      }),
+      runJob: async () =>
+        jobResult(['RESULT {"file": "a.tflite", "maxAbsDiff": 0}']),
+    });
+    await convertOnnxToTflite(log, "/data/custom", "a.onnx");
+    const config = handle.callsTo("runJob")[0]?.args[0] as {
+      outputs: Record<string, string>;
+    };
+    expect(config.outputs).toEqual({
+      "/work": "/mnt/volume/plugin-config-data/signalk-container/custom",
+    });
+  });
+
   // The whole reason conversion validates numerically: onnx2tf silently swaps
   // a 3D input's layout, producing a model that scores garbage with no error.
   it("rejects a model whose outputs drifted from the ONNX original", async () => {

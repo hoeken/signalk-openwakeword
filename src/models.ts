@@ -15,6 +15,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
+  CONTAINER_PLUGIN_ID,
   CUSTOM_MODEL_DIRNAME,
   MAX_MODEL_BYTES,
   type ModelFormat,
@@ -101,17 +102,36 @@ export function assertSafeFilename(filename: string): void {
 /** Resolver for the shared signalk-container data dir (test seam). */
 export type DataMountResolver = () => Promise<string | null>;
 
+/** The slice of the plugin `app` object needed to locate the data dir. */
+export interface DataDirApp {
+  getDataDirPath?(): string;
+}
+
 /**
- * Resolve the host path of the shared signalk-container data dir via the
- * container manager. `resolveSignalkDataMount` is what backs the
- * `signalkDataMount: "/data"` we already pass in buildContainerConfig, so
- * using it here guarantees both sides name the same directory.
+ * Resolve the signalk-container plugin's data directory **as this process
+ * sees it**.
+ *
+ * The subtlety that matters: `manager.resolveSignalkDataMount()` returns the
+ * *host* path, which is what podman needs as a bind source — but it is NOT
+ * where this code can read and write. When Signal K itself runs in a
+ * container, the host path (`/home/dirk/.signalk/...`) does not exist inside
+ * it; the same directory is visible at `/home/node/.signalk/...`. Using the
+ * host path here fails with EACCES/ENOENT on exactly the deployment this
+ * plugin is most often used in.
+ *
+ * `app.getDataDirPath()` is always local and always correct, so we take this
+ * plugin's own data dir and walk one level up to its sibling. Both live under
+ * `<configPath>/plugin-config-data/`, and signalk-container's own directory is
+ * what `signalkDataMount: "/data"` maps to — so the container's
+ * `/data/custom` and the directory returned here are the same place.
  */
-export const defaultDataMountResolver: DataMountResolver = async () => {
-  const manager = globalThis.__signalk_containerManager;
-  if (manager?.resolveSignalkDataMount === undefined) return null;
-  return manager.resolveSignalkDataMount();
-};
+export function makeDataMountResolver(app: DataDirApp): DataMountResolver {
+  return async () => {
+    const own = app.getDataDirPath?.();
+    if (own === undefined || own === "") return null;
+    return path.join(path.dirname(own), CONTAINER_PLUGIN_ID);
+  };
+}
 
 export class ModelStore {
   constructor(private readonly resolveDataMount: DataMountResolver) {}

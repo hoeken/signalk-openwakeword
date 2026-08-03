@@ -88,6 +88,10 @@ export function installFakeManager(
     runJob?: (config: unknown) => Promise<unknown>;
     /** Host dir reported as the shared signalk-container data mount. */
     dataMount?: string | null;
+    /** Local → host path translation; omit to leave the method undefined. */
+    resolveHostPath?: (
+      absPath: string,
+    ) => Promise<{ source: string; subPath: string } | null>;
   } = {},
 ): FakeManagerHandle {
   const calls: FakeCall[] = [];
@@ -127,6 +131,11 @@ export function installFakeManager(
       return handle.address;
     },
     resolveSignalkDataMount: async () => options.dataMount ?? null,
+    // Left undefined unless a test opts in, mirroring an older manager that
+    // predates resolveHostPath (1.7.0+) so the fallback path is exercised too.
+    ...(options.resolveHostPath === undefined
+      ? {}
+      : { resolveHostPath: options.resolveHostPath }),
     runJob: async (config: unknown) => {
       calls.push({ method: "runJob", args: [config] });
       if (options.runJob !== undefined) return options.runJob(config);

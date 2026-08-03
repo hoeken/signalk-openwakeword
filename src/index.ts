@@ -21,6 +21,7 @@ import {
   CONTAINER_NAME,
   IMAGE,
   isSemverTag,
+  MAX_MODEL_BYTES,
   PLUGIN_ID,
   PLUGIN_NAME,
   resolveTag,
@@ -33,7 +34,7 @@ import {
   type ServiceApp,
 } from "./service.js";
 import {
-  defaultDataMountResolver,
+  makeDataMountResolver,
   ModelStore,
   ModelStoreError,
   modelFormat,
@@ -55,6 +56,8 @@ export interface PluginApp extends ServiceApp {
     callback: (err: unknown) => void,
   ): void;
   readPluginOptions?(): { configuration?: Record<string, unknown> } | undefined;
+  /** This plugin's data dir, as seen by the Signal K process. */
+  getDataDirPath?(): string;
 }
 
 type RouteHandler = (req: unknown, res: ResponseLike) => unknown;
@@ -77,6 +80,42 @@ interface RequestLike {
   query?: Record<string, unknown>;
   params?: Record<string, unknown>;
   body?: unknown;
+  /** Present when the request is still an unread stream (see readBody). */
+  on?: (event: string, listener: (...args: unknown[]) => void) => unknown;
+  readable?: boolean;
+}
+
+/**
+ * Read a model upload out of the request.
+ *
+ * Signal K registers only the `json` and `urlencoded` body parsers, so an
+ * `application/octet-stream` upload arrives as an unconsumed stream and
+ * `req.body` is undefined — a plugin that assumes Express handed it a Buffer
+ * rejects every real upload. Collect the stream ourselves, capping it at the
+ * same limit the store enforces so a runaway request cannot fill the boat's
+ * disk before the size check runs.
+ */
+function readBody(req: RequestLike, limit: number): Promise<Buffer> {
+  if (Buffer.isBuffer(req.body)) return Promise.resolve(req.body);
+  return new Promise((resolve, reject) => {
+    if (typeof req.on !== "function" || req.readable === false) {
+      reject(new Error("request body is not readable"));
+      return;
+    }
+    const chunks: Buffer[] = [];
+    let total = 0;
+    req.on("data", (chunk: unknown) => {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+      total += buf.length;
+      if (total > limit) {
+        reject(new Error(`upload exceeds the ${limit}-byte limit`));
+        return;
+      }
+      chunks.push(buf);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", (err: unknown) => reject(err as Error));
+  });
 }
 
 export interface OpenWakeWordPlugin {
@@ -96,7 +135,7 @@ export interface OpenWakeWordPlugin {
 export default function createPlugin(
   app: PluginApp,
   timing: Partial<RunnerTiming> = {},
-  resolveDataMount: DataMountResolver = defaultDataMountResolver,
+  resolveDataMount: DataMountResolver = makeDataMountResolver(app),
 ): OpenWakeWordPlugin {
   let running = false;
   let settings: OpenWakeWordSettings = withDefaults(undefined);
@@ -165,6 +204,23 @@ export default function createPlugin(
       // Never leave the conversion message as the plugin's resting status.
       runner?.refreshStatus();
     }
+  };
+
+  /**
+   * Restart the wake word service so a newly installed model is actually
+   * loaded — it only scans its model directory at startup, so without this a
+   * fresh upload stays invisible until the next manual restart.
+   *
+   * Only worth doing for a `.tflite` (the only format the service reads) and
+   * only when custom models are switched on. Returns whether a restart ran, so
+   * the UI can say "ready now" instead of "restart to load".
+   */
+  const reloadForModels = async (format: string): Promise<boolean> => {
+    if (format !== "tflite") return false;
+    if (!settings.advanced.customModels) return false;
+    if (runner === null || !running) return false;
+    await runner.reload();
+    return true;
   };
 
   /** Map the module error types onto HTTP without leaking stack traces. */
@@ -300,12 +356,14 @@ export default function createPlugin(
           return;
         }
         const { filename, convert, overwrite } = parsed.value;
-        const body = request.body;
-        if (!Buffer.isBuffer(body)) {
+        let body: Buffer;
+        try {
+          body = await readBody(request, MAX_MODEL_BYTES);
+        } catch (err) {
           res.status(400).json({
             error:
-              "expected the model file as the raw request body " +
-              "(Content-Type: application/octet-stream)",
+              `could not read the uploaded file: ${errMsg(err)}. Send it as ` +
+              "the raw request body (Content-Type: application/octet-stream).",
           });
           return;
         }
@@ -314,11 +372,13 @@ export default function createPlugin(
             ...(overwrite === true ? { overwrite: true } : {}),
           });
           if (installed.format === "tflite" || convert !== true) {
-            res.json({ model: installed, converted: null });
+            const reloaded = await reloadForModels(installed.format);
+            res.json({ model: installed, converted: null, reloaded });
             return;
           }
           const converted = await runConversion(filename);
-          res.json({ model: installed, converted });
+          const reloaded = await reloadForModels("tflite");
+          res.json({ model: installed, converted, reloaded });
         } catch (err) {
           respondError(res, err);
         }
@@ -345,9 +405,13 @@ export default function createPlugin(
 
       // Express always provides delete(); RouterLike does not declare it.
       router.delete?.("/api/models/:name", async (req, res) => {
+        const name = String((req as RequestLike).params?.name ?? "");
         try {
-          await models.remove(String((req as RequestLike).params?.name ?? ""));
-          res.json({ ok: true });
+          await models.remove(name);
+          // Restart too, so a deleted wake word stops being advertised
+          // instead of lingering until the next restart.
+          const reloaded = await reloadForModels(modelFormat(name) ?? "");
+          res.json({ ok: true, reloaded });
         } catch (err) {
           respondError(res, err);
         }

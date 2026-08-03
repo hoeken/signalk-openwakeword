@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   assertSafeFilename,
+  makeDataMountResolver,
   ModelStore,
   ModelStoreError,
   modelFormat,
@@ -76,6 +77,26 @@ describe("assertSafeFilename", () => {
 
   it("rejects an unsupported extension", () => {
     expect(() => assertSafeFilename("model.pkl")).toThrow(/unsupported/i);
+  });
+});
+
+describe("makeDataMountResolver", () => {
+  // Regression: this used to call manager.resolveSignalkDataMount(), which
+  // returns the HOST path. When Signal K itself runs in a container the host
+  // path does not exist inside it, and every model request died with
+  // "EACCES: permission denied, mkdir '/home/dirk'".
+  it("derives signalk-container's data dir from our own, staying local", async () => {
+    const resolve = makeDataMountResolver({
+      getDataDirPath: () =>
+        "/home/node/.signalk/plugin-config-data/signalk-openwakeword",
+    });
+    await expect(resolve()).resolves.toBe(
+      "/home/node/.signalk/plugin-config-data/signalk-container",
+    );
+  });
+
+  it("returns null when the server does not expose a data dir", async () => {
+    await expect(makeDataMountResolver({})()).resolves.toBeNull();
   });
 });
 

@@ -25,6 +25,13 @@ export const SERVICE_NAME = "openwakeword";
  */
 export const CONVERTER_IMAGE = "pinto0309/onnx2tf";
 export const CONVERTER_TAG = "2.6.8";
+/**
+ * The uid/gid the converter image's baked-in USER runs as. Declared so
+ * signalk-container can map ownership on the bind mount — without it the job
+ * cannot write its output and fails with PermissionError on /work.
+ */
+export const CONVERTER_IMAGE_UID = 1001;
+export const CONVERTER_IMAGE_GID = 1001;
 /** Hard ceiling on a conversion job; real conversions take a few seconds. */
 export const CONVERT_TIMEOUT_SECONDS = 600;
 
@@ -34,6 +41,13 @@ export const CONVERT_TIMEOUT_SECONDS = 600;
  * container sees it as `/data/custom` (see buildCommand).
  */
 export const CUSTOM_MODEL_DIRNAME = "custom";
+
+/**
+ * npm id of the signalk-container plugin, whose data directory is the one
+ * `signalkDataMount` maps to `/data` — and therefore where `custom/` lives.
+ * Used to locate that sibling directory from our own data dir path.
+ */
+export const CONTAINER_PLUGIN_ID = "signalk-container";
 
 /**
  * Model file formats the plugin accepts. Only `tflite` is loadable:

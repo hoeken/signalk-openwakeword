@@ -279,6 +279,31 @@ export class ServiceRunner {
     });
   }
 
+  /**
+   * Restart the service so it re-scans its custom-model directory.
+   *
+   * wyoming-openwakeword globs `--custom-model-dir` once at startup, so a
+   * model added afterwards is invisible until the container restarts. Without
+   * this, a freshly uploaded wake word stays "installed but not loaded"
+   * indefinitely and the only cure is a manual restart.
+   *
+   * Never throws: a failed reload leaves the running service untouched, and
+   * the model still loads on the next ordinary restart.
+   */
+  async reload(): Promise<void> {
+    if (this.stopped) return;
+    this.app.debug("restarting the wake word service to pick up model changes");
+    try {
+      await this.container.stop();
+      const { tag } = await this.container.start(this.settings.imageTag);
+      if (this.stopped) return;
+      this.tag = tag;
+      await this.probeUntilReady(tag);
+    } catch (err) {
+      this.app.error(`could not restart to load new models: ${errMsg(err)}`);
+    }
+  }
+
   /** Never throws; awaited by the server via plugin.stop(). */
   async stop(): Promise<void> {
     this.stopped = true;

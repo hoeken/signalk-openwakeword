@@ -27,6 +27,7 @@ npm install
 npm run build                 # tsc → dist/, webpack → public/ (panel), vite → public/ (webapp)
 npm test                      # typecheck (tsconfig.test.json) + vitest
 npm run test:e2e              # build, then drive the webapp in headless chromium
+npm run test:e2e:live         # drive a REAL server (SK_URL/SK_USER/SK_PASSWORD)
 npm run test:watch            # vitest watch mode
 npm run ci-lint               # eslint + prettier --check
 npm run format                # prettier + eslint --fix
@@ -157,6 +158,35 @@ Two things in there are load-bearing and must not be simplified away:
 Training is deliberately **not** implemented: it needs ~17 GB of
 precomputed features and a CUDA GPU, so `src/train.ts` generates a
 pre-filled Colab config instead of pretending a Pi can do it.
+
+### Deployment realities (all found by running against a real server)
+
+Four things behave differently in a containerized Signal K than any stubbed
+test suggests. Each one broke the feature outright, so don't "simplify" them
+away:
+
+1. **Local path ≠ host path.** `manager.resolveSignalkDataMount()` returns the
+   _host_ path — right for a bind-mount source, wrong for our own `fs` calls.
+   With Signal K in a container the host path does not exist inside it, and
+   every model request died with `EACCES: mkdir '/home/dirk'`. `models.ts`
+   therefore derives the directory from `app.getDataDirPath()` (always local),
+   while `convert.ts` translates back via `resolveHostPath()` before handing a
+   mount source to the runtime.
+2. **Uploads arrive as an unread stream.** Signal K registers only the `json`
+   and `urlencoded` body parsers, so `application/octet-stream` never becomes
+   `req.body`. `readBody()` consumes the stream itself, capped at
+   `MAX_MODEL_BYTES`.
+3. **The converter image runs as a non-root USER (uid 1001).** Without
+   `user: { inImageUid, inImageGid }` on the job, rootless podman remaps it and
+   the conversion dies with `PermissionError` on `/work`.
+4. **The service only scans its model directory at startup.** A newly uploaded
+   wake word is invisible until the container restarts, so installs and deletes
+   call `ServiceRunner.reload()`. The route reports `reloaded` so the UI can
+   distinguish "ready now" from "restart to load".
+
+`npm run test:e2e:live` exercises all four against a running server —
+uploading a real community model, converting a real ONNX one, and asserting
+wyoming-openwakeword actually advertises them.
 
 ### One API contract, shared by the server and the webapp
 
