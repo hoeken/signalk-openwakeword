@@ -15,6 +15,8 @@
 import { errMsg } from "signalk-container-helper";
 import {
   CONVERTER_IMAGE,
+  CONVERTER_IMAGE_GID,
+  CONVERTER_IMAGE_UID,
   CONVERTER_TAG,
   CONVERT_TIMEOUT_SECONDS,
   PLUGIN_ID,
@@ -66,11 +68,17 @@ export class ConvertError extends Error {
  *    community models), which otherwise only surface at allocate_tensors().
  */
 const CONVERT_SCRIPT = String.raw`
-import glob, json, os, sys
+import glob, json, os, shutil, sys, tempfile
 import numpy as np, onnx, onnxruntime as ort
 from onnx import helper, TensorProto
 
 src, out_dir, stem = sys.argv[1], sys.argv[2], sys.argv[3]
+
+# onnx2tf scatters intermediates (float16 variants, correspondence reports,
+# schema.fbs, schema_generated.py) beside its output. Work in a scratch dir so
+# none of that ever lands in the user's model directory — only the finished
+# .tflite is copied back at the end.
+work = tempfile.mkdtemp(prefix="oww-convert-")
 
 model = onnx.load(src)
 g = model.graph
@@ -78,7 +86,7 @@ inp = g.input[0]
 dims = [d.dim_value if d.dim_value > 0 else 1 for d in inp.type.tensor_type.shape.dim]
 print("PROBE input=%s shape=%s" % (inp.name, dims), flush=True)
 
-prepped = os.path.join(out_dir, stem + ".prepped.onnx")
+prepped = os.path.join(work, stem + ".prepped.onnx")
 if len(dims) == 3:
     # Pre-transpose so onnx2tf's NCW->NWC swap restores the original layout.
     swapped = [dims[0], dims[2], dims[1]]
@@ -93,13 +101,14 @@ else:
     prepped = src
     print("PROBE no transpose (rank %d)" % len(dims), flush=True)
 
-rc = os.system("onnx2tf -i %s -o %s -osd -n" % (prepped, out_dir))
+rc = os.system("cd %s && onnx2tf -i %s -o %s -osd -n" % (work, prepped, work))
 if rc != 0:
     print("ERROR onnx2tf exited %d" % rc, flush=True)
     sys.exit(2)
 
-produced = sorted(glob.glob(os.path.join(out_dir, "*_float32.tflite"))) or \
-           sorted(glob.glob(os.path.join(out_dir, "*.tflite")))
+produced = sorted(glob.glob(os.path.join(work, "*_float32.tflite"))) or \
+           [p for p in sorted(glob.glob(os.path.join(work, "*.tflite")))
+            if "float16" not in os.path.basename(p)]
 if not produced:
     print("ERROR onnx2tf produced no .tflite", flush=True)
     sys.exit(3)
@@ -131,15 +140,10 @@ for _ in range(8):
     got = interp.get_tensor(tout["index"])
     worst = max(worst, float(np.max(np.abs(np.asarray(ref).ravel() - np.asarray(got).ravel()))))
 
+# Only the validated model crosses back into the user's directory.
 final = os.path.join(out_dir, stem + ".tflite")
-if os.path.abspath(tflite_path) != os.path.abspath(final):
-    os.replace(tflite_path, final)
-for junk in glob.glob(os.path.join(out_dir, "*_float32.tflite")) + [prepped]:
-    if os.path.abspath(junk) != os.path.abspath(final) and os.path.exists(junk):
-        try:
-            os.remove(junk)
-        except OSError:
-            pass
+shutil.copyfile(tflite_path, final)
+shutil.rmtree(work, ignore_errors=True)
 
 print("RESULT " + json.dumps({"file": os.path.basename(final), "maxAbsDiff": worst}), flush=True)
 `;
@@ -147,12 +151,16 @@ print("RESULT " + json.dumps({"file": os.path.basename(final), "maxAbsDiff": wor
 /**
  * Convert `<stem>.onnx` in the custom-model directory to `<stem>.tflite`.
  *
- * `hostDir` is the host path of the custom-model dir; it is mounted
- * read-write so the job can drop the .tflite straight in beside the source.
+ * `localDir` is the custom-model directory as THIS process sees it. It is
+ * translated to a host path before being handed to the runtime: a bind mount
+ * source is interpreted by the host's podman/docker, so when Signal K itself
+ * runs in a container the two differ (`/home/node/...` here vs
+ * `/home/dirk/...` on the host) and mounting the local path would silently
+ * bind an empty or non-existent directory.
  */
 export async function convertOnnxToTflite(
   log: ConvertLogger,
-  hostDir: string,
+  localDir: string,
   onnxFilename: string,
   maxAbsDiff = 1e-4,
 ): Promise<ConvertResult> {
@@ -163,6 +171,7 @@ export async function convertOnnxToTflite(
       "manager-unavailable",
     );
   }
+  const mountSource = await toHostPath(manager, localDir);
   const stem = onnxFilename.replace(/\.onnx$/i, "");
   const lines: string[] = [];
   const collect = (line: string): void => {
@@ -181,7 +190,14 @@ export async function convertOnnxToTflite(
       ],
       env: { OWW_SCRIPT: CONVERT_SCRIPT },
       // Read-write: the converted .tflite is written back beside the source.
-      outputs: { "/work": hostDir },
+      outputs: { "/work": mountSource },
+      // The onnx2tf image declares a non-root USER, so without this mapping
+      // the job cannot write to the bind mount (rootless podman remaps the
+      // in-image uid) and conversion dies on PermissionError.
+      user: {
+        inImageUid: CONVERTER_IMAGE_UID,
+        inImageGid: CONVERTER_IMAGE_GID,
+      },
       timeout: CONVERT_TIMEOUT_SECONDS,
       label: `openwakeword-convert-${stem}`,
       ownerPluginId: PLUGIN_ID,
@@ -223,6 +239,27 @@ export async function convertOnnxToTflite(
     );
   }
   return { filename: summary.file, maxAbsDiff: summary.maxAbsDiff, log: all };
+}
+
+/**
+ * Translate a path this process can see into one the host runtime can bind.
+ *
+ * On bare metal these are the same string and `resolveHostPath` simply echoes
+ * it back. When Signal K runs in a container they differ, and getting it wrong
+ * mounts the wrong directory rather than failing loudly — so fall back to the
+ * local path only when the manager is too old to translate (1.7.0+), which is
+ * also the case where the two genuinely are the same.
+ */
+async function toHostPath(
+  manager: NonNullable<typeof globalThis.__signalk_containerManager>,
+  localPath: string,
+): Promise<string> {
+  if (manager.resolveHostPath === undefined) return localPath;
+  const resolved = await manager.resolveHostPath(localPath);
+  if (resolved === null) return localPath;
+  return resolved.subPath === ""
+    ? resolved.source
+    : `${resolved.source}/${resolved.subPath}`.replace(/\/{2,}/g, "/");
 }
 
 function parseResult(

@@ -8,7 +8,7 @@ import createPlugin, {
   type OpenWakeWordPlugin,
   type PluginRouter,
 } from "../src/index.js";
-import { CONFIG_SCHEMA } from "../src/config.js";
+import { CONFIG_SCHEMA, MAX_MODEL_BYTES } from "../src/config.js";
 import {
   createFakeApp,
   emittedStatuses,
@@ -353,6 +353,49 @@ describe("custom model routes", () => {
     );
   });
 
+  // Signal K registers only the json and urlencoded body parsers, so a real
+  // octet-stream upload arrives as an unconsumed stream with req.body
+  // undefined. Assuming Express handed us a Buffer rejected every real upload.
+  it("reads an upload that arrives as an unparsed request stream", async () => {
+    const { routes } = setup();
+    const res = makeRes();
+    const listeners: Record<string, (arg?: unknown) => void> = {};
+    const req = {
+      query: { filename: "streamed.tflite" },
+      readable: true,
+      on(event: string, listener: (arg?: unknown) => void) {
+        listeners[event] = listener;
+        return req;
+      },
+    };
+    const pending = findRoute(routes, "post", "/api/models").handler(req, res);
+    listeners.data?.(Buffer.from("TFL3-model-bytes"));
+    listeners.end?.();
+    await pending;
+    expect(res.code).toBe(200);
+    expect(res.body).toMatchObject({ model: { id: "streamed" } });
+  });
+
+  it("aborts a streamed upload that exceeds the size limit", async () => {
+    const { routes } = setup();
+    const res = makeRes();
+    const listeners: Record<string, (arg?: unknown) => void> = {};
+    const req = {
+      query: { filename: "huge.tflite" },
+      readable: true,
+      on(event: string, listener: (arg?: unknown) => void) {
+        listeners[event] = listener;
+        return req;
+      },
+    };
+    const pending = findRoute(routes, "post", "/api/models").handler(req, res);
+    listeners.data?.(Buffer.alloc(MAX_MODEL_BYTES + 1));
+    listeners.end?.();
+    await pending;
+    expect(res.code).toBe(400);
+    expect(String((res.body as { error: string }).error)).toMatch(/limit/);
+  });
+
   it("rejects an upload with a missing filename via schema validation", async () => {
     const { routes } = setup();
     const res = makeRes();
@@ -427,7 +470,56 @@ describe("custom model routes", () => {
       { params: { name: "a.tflite" } },
       res,
     );
-    expect(res.body).toEqual({ ok: true });
+    // reloaded=false because this plugin instance was never started, so there
+    // is no running service to restart.
+    expect(res.body).toEqual({ ok: true, reloaded: false });
+  });
+
+  // wyoming-openwakeword only scans --custom-model-dir at startup, so without
+  // an automatic restart a freshly uploaded wake word stays invisible.
+  it("restarts the service so a newly uploaded model is actually loaded", async () => {
+    server = new MockWyomingServer({ role: "wake" });
+    const port = await server.listen();
+    manager = installFakeManager({ dataMount });
+    const app = createFakeApp();
+    plugin = createPlugin(app, FAST_TIMING, async () => dataMount);
+    const { router, routes } = makeRouter();
+    plugin.registerWithRouter(router);
+
+    plugin.start({ port, advanced: { customModels: true } });
+    await waitFor(() => emittedStatuses(app).at(-1) === "ready");
+    const before = manager.callsTo("ensureRunning").length;
+
+    const res = makeRes();
+    await findRoute(routes, "post", "/api/models").handler(
+      { query: { filename: "fresh.tflite" }, body: Buffer.from("TFL3xx") },
+      res,
+    );
+    expect(res.body).toMatchObject({ reloaded: true });
+    expect(manager.callsTo("stop").length).toBeGreaterThan(0);
+    expect(manager.callsTo("ensureRunning").length).toBeGreaterThan(before);
+  });
+
+  it("does not restart when custom models are switched off", async () => {
+    server = new MockWyomingServer({ role: "wake" });
+    const port = await server.listen();
+    manager = installFakeManager({ dataMount });
+    const app = createFakeApp();
+    plugin = createPlugin(app, FAST_TIMING, async () => dataMount);
+    const { router, routes } = makeRouter();
+    plugin.registerWithRouter(router);
+
+    plugin.start({ port });
+    await waitFor(() => emittedStatuses(app).at(-1) === "ready");
+    const stops = manager.callsTo("stop").length;
+
+    const res = makeRes();
+    await findRoute(routes, "post", "/api/models").handler(
+      { query: { filename: "fresh.tflite" }, body: Buffer.from("TFL3xx") },
+      res,
+    );
+    expect(res.body).toMatchObject({ reloaded: false });
+    expect(manager.callsTo("stop").length).toBe(stops);
   });
 
   it("returns a pre-filled training plan for a phrase", async () => {
