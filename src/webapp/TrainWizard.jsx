@@ -93,6 +93,10 @@ export default function TrainWizard({ onClose }) {
               beats a common word — the detector matches on sound, so an
               everyday phrase will wake the boat during normal conversation.
             </p>
+            <p className="hint">
+              Nothing to record and no scripts to write: you'll edit two lines
+              in a notebook, press Run, and come back with the finished file.
+            </p>
             {error && <p className="notice error">{error}</p>}
             <div className="modal-actions">
               <button onClick={onClose}>Cancel</button>
@@ -118,17 +122,32 @@ export default function TrainWizard({ onClose }) {
               </p>
             ))}
             <p>
-              Training runs on Google Colab's GPU and takes about an hour. It
-              cannot run on this Signal K server — the training data alone is
-              around 17 GB and it needs a graphics card.
+              Training runs on Google Colab's GPU: about 75–90 minutes on a paid
+              Colab plan, and roughly twice that on the free tier. It cannot run
+              on this Signal K server — the training data alone is around 17 GB
+              and it needs a graphics card.
             </p>
-            <label htmlFor="config">Paste this into the notebook:</label>
+            <p className="hint">
+              You don't need a microphone. The notebook synthesises the training
+              audio by having a speech engine say your phrase thousands of times
+              in different voices.
+            </p>
+            <label htmlFor="config">
+              In the notebook, find the cell marked{" "}
+              <strong>★ EDIT THESE TWO LINES ★</strong> and replace its two
+              lines with these:
+            </label>
             <pre id="config" className="config">
               {plan.config}
             </pre>
+            <p className="hint">
+              That is the only edit you make — leave every other cell alone.
+              Then choose <strong>Runtime → Run all</strong> and leave it to
+              work.
+            </p>
             <div className="row">
               <button onClick={copyConfig}>
-                {copied ? "Copied" : "Copy config"}
+                {copied ? "Copied" : "Copy these lines"}
               </button>
               <a
                 className="button primary"

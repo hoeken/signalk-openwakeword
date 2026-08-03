@@ -154,24 +154,27 @@ export function buildTrainingPlan(phrase: string): TrainingPlan {
     modelId: slug,
     notebookUrl: NOTEBOOK_URL,
     advice: advisePhrase(trimmed),
+    // The notebook does NOT take a YAML config — it has two Python variables
+    // in one cell (marked "★ EDIT THESE TWO LINES ★") that you overwrite.
+    // Emit exactly those two lines so they can be pasted straight over the
+    // originals. TARGET_PHRASE is a list: extra entries are pronunciation
+    // variants that all train into the same wake word.
     config: [
-      `target_phrase: ["${trimmed}"]`,
-      `model_name: "${slug}"`,
-      "n_samples: 5000",
-      "n_samples_val: 1000",
-      "steps: 10000",
-      "target_accuracy: 0.7",
-      "target_recall: 0.5",
+      `TARGET_PHRASE = ['${trimmed.replace(/'/g, "\\'")}']`,
+      `MODEL_NAME    = '${slug}'`,
     ].join("\n"),
     steps: [
-      `Open the training notebook and set the phrase to "${trimmed}" ` +
-        `and the model name to "${slug}".`,
-      "Run the notebook. It needs a GPU runtime and takes roughly an hour — " +
-        "this cannot run on the Signal K server, which has no GPU.",
-      `Download the resulting ${slug}.onnx file when it finishes.`,
-      "Upload it here. It is converted to the .tflite format the wake word " +
-        "service requires, checked against the original for accuracy, and " +
-        "installed automatically.",
+      "Open the notebook, then scroll down to the cell marked " +
+        "“★ EDIT THESE TWO LINES ★”.",
+      `Replace its two lines with the two above, so it trains on ` +
+        `“${trimmed}”. Leave every other cell alone.`,
+      "Choose Runtime → Run all, and leave it. It needs Google's GPU and " +
+        "takes about an hour — it cannot run on the Signal K server, which " +
+        "has no graphics card.",
+      `When it finishes, download the ${slug}.onnx file it produced.`,
+      "Come back here and drop that file on this page. It is converted to " +
+        "the format the wake word service needs, checked against the " +
+        "original, and installed for you.",
     ],
   };
 }

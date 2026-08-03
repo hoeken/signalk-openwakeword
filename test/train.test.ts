@@ -36,10 +36,26 @@ describe("advisePhrase", () => {
 });
 
 describe("buildTrainingPlan", () => {
-  it("pre-fills the notebook config with the phrase and slug", () => {
+  // The notebook takes two Python variables in an "EDIT THESE TWO LINES"
+  // cell, NOT a YAML config — emitting YAML sent people hunting for a paste
+  // target that does not exist.
+  it("emits the two Python lines the notebook actually wants", () => {
     const plan = buildTrainingPlan("Hey Seabird");
-    expect(plan.config).toContain('target_phrase: ["Hey Seabird"]');
-    expect(plan.config).toContain('model_name: "hey_seabird"');
+    expect(plan.config).toBe(
+      "TARGET_PHRASE = ['Hey Seabird']\nMODEL_NAME    = 'hey_seabird'",
+    );
+  });
+
+  it("escapes an apostrophe so the Python literal stays valid", () => {
+    expect(buildTrainingPlan("ahoy o'brien").config).toContain(
+      "TARGET_PHRASE = ['ahoy o\\'brien']",
+    );
+  });
+
+  it("tells the user which cell to edit", () => {
+    expect(buildTrainingPlan("hey seabird").steps.join(" ")).toMatch(
+      /EDIT THESE TWO LINES/,
+    );
   });
 
   // No _vN suffix: wyoming's stripping regex forbids underscores, so a
