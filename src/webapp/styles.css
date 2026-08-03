@@ -355,6 +355,24 @@ button.danger:hover:not(:disabled) {
   overflow-x: auto;
 }
 
+/* Click-to-select, for when the browser blocks programmatic copying. */
+.config.selectable {
+  cursor: text;
+  user-select: all;
+}
+.config.selectable:hover {
+  border-color: var(--accent);
+}
+
+kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  padding: 0.1em 0.35em;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  opacity: 0.9;
+}
+
 /* Wizard steps ------------------------------------------------------- */
 .steps {
   display: flex;

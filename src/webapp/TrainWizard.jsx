@@ -8,8 +8,9 @@
  * notebook config, and dealing with the ONNX file that comes back.
  */
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useStore } from "./store.js";
+import { copyText } from "./clipboard.js";
 
 export default function TrainWizard({ onClose }) {
   const [step, setStep] = useState(1);
@@ -17,6 +18,8 @@ export default function TrainWizard({ onClose }) {
   const [plan, setPlan] = useState(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const configRef = useRef(null);
   const upload = useStore((s) => s.upload);
   const busyWith = useStore((s) => s.busyWith);
 
@@ -31,13 +34,27 @@ export default function TrainWizard({ onClose }) {
   };
 
   const copyConfig = async () => {
-    try {
-      await navigator.clipboard.writeText(plan.config);
+    if (await copyText(plan.config)) {
       setCopied(true);
+      setCopyFailed(false);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setError("Could not copy — select the text and copy it manually.");
+      return;
     }
+    // Last resort: select the text for them, so it is one keystroke away
+    // rather than a fiddly drag over two lines of code.
+    setCopyFailed(true);
+    selectConfig();
+  };
+
+  /** Put the two config lines under the user's selection. */
+  const selectConfig = () => {
+    const node = configRef.current;
+    if (!node || typeof window.getSelection !== "function") return;
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    selection.removeAllRanges();
+    selection.addRange(range);
   };
 
   const onFile = async (event) => {
@@ -137,9 +154,22 @@ export default function TrainWizard({ onClose }) {
               <strong>★ EDIT THESE TWO LINES ★</strong> and replace its two
               lines with these:
             </label>
-            <pre id="config" className="config">
+            <pre
+              id="config"
+              className="config selectable"
+              ref={configRef}
+              onClick={selectConfig}
+              title="Click to select"
+            >
               {plan.config}
             </pre>
+            {copyFailed && (
+              <p className="notice warn">
+                This browser won't let a page copy for you over plain HTTP (it
+                needs HTTPS). The lines are selected — press <kbd>Ctrl</kbd>+
+                <kbd>C</kbd> to copy them.
+              </p>
+            )}
             <p className="hint">
               That is the only edit you make — leave every other cell alone.
               Then choose <strong>Runtime → Run all</strong> and leave it to

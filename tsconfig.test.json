@@ -2,7 +2,13 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "rootDir": "."
+    "rootDir": ".",
+    // Tests cover browser code too (the clipboard fallback), so they need DOM
+    // types alongside the Node ones the plugin itself uses.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
+  // The main config excludes src/webapp (it must not be emitted into dist/),
+  // but the tests do exercise parts of it.
+  "exclude": [],
   "include": ["src", "test"]
 }
