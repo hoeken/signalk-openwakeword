@@ -66,7 +66,7 @@ support you get a plain settings form with the same options.
 | `memoryLimit`                | `384m`           | Container memory cap (swap disabled).                                                                                                     |
 | `restartPolicy`              | `unless-stopped` | Container restart policy.                                                                                                                 |
 | `advanced.refractorySeconds` | _(unset)_        | Minimum seconds between re-detections (upstream default 2.0).                                                                             |
-| `advanced.customModels`      | `false`          | Load your own model files. See [Custom wake words](#custom-wake-words).                                                                   |
+| `advanced.customModels`      | `false`          | Load your own model files. Manage them in the **Custom wake words** webapp — see [Custom wake words](#custom-wake-words).                 |
 | `advanced.advertiseHost`     | _(unset)_        | Overrides the host part of the advertised `tcp://` URI (containerized Signal K, multi-NIC hosts).                                         |
 
 ### Wake words & sensitivity
@@ -91,17 +91,56 @@ Tuning for your boat:
 
 ## Custom wake words
 
-Want your boat to answer to its own name? Enable
-`advanced.customModels`, then drop openWakeWord `.tflite` model files into
-the `custom/` folder inside the **signalk-container** plugin's data
-directory (`<signalk>/plugin-config-data/signalk-container/custom/` —
-create `custom/` if it doesn't exist; note this is signalk-container's
-directory, shared by all plugins that use it, not this plugin's own) and
-restart the plugin. If Signal K itself runs in a container with a
-volume-backed data directory, put the files in the corresponding location
-inside that volume. A `_v1.0`-style filename suffix is stripped for the
-model id. A webapp upload UI is planned for v1.x; the manual drop works
-today.
+Want your boat to answer to its own name? Open **Custom wake words** from
+the Webapps menu. It lists what is installed, takes new models by drag and
+drop, and walks you through creating one from scratch — no ssh, no file
+paths.
+
+Turn on `advanced.customModels` in the plugin settings and restart the
+plugin for custom models to be loaded at all. The webapp warns you if you
+forget.
+
+### Adding a model you already have
+
+Drop the file on the webapp. Two formats are accepted:
+
+- **`.tflite`** — installed as-is. This is the only format the wake word
+  service can load.
+- **`.onnx`** — converted on the server automatically, then checked
+  numerically against the original before it is installed. The training
+  notebooks produce ONNX, so this is the usual case.
+
+Good ready-made models live in the
+[home-assistant-wakewords-collection](https://github.com/fwartner/home-assistant-wakewords-collection);
+most ship both formats, so grab the `.tflite` and skip the conversion.
+
+### Creating a new one
+
+Use **Create a wake word** in the webapp. You give it a phrase; it tells you
+whether the phrase will work well, fills in the training config, and links
+you to the notebook. Training runs on a free Google Colab GPU and takes
+about an hour — it **cannot** run on the Signal K server, which has no
+graphics card and would need roughly 17 GB of training data. When it
+finishes you upload the `.onnx` it produced and the webapp handles the rest.
+
+Pick something distinctive with three or more syllables. openWakeWord
+matches on sound, so an everyday phrase will wake the boat in the middle of
+normal conversation.
+
+### Wake word names
+
+The name you put in `wakeWords` is derived from the filename, and the rule
+has a sharp edge worth knowing: a `_v1`-style suffix is stripped **only**
+when the rest of the name has no underscores. So `alexa_v0.1.tflite`
+becomes `alexa`, but `hey_boat_v1.tflite` stays `hey_boat_v1`. The webapp
+always shows the name the service will actually advertise, so use what it
+tells you.
+
+Models are stored in the **signalk-container** plugin's data directory
+(`<signalk>/plugin-config-data/signalk-container/custom/`), which is shared
+by all plugins that use it rather than being this plugin's own. The webapp
+creates it for you. If Signal K itself runs in a container, that path is
+inside the corresponding volume.
 
 ## Using it from other software
 
@@ -117,12 +156,20 @@ Once ready, the service is a plain Wyoming wake word server at
 
 ## HTTP API
 
-| Endpoint                                              | Access                 | Purpose                                                                                        |
-| ----------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------- |
-| `GET /plugins/signalk-openwakeword/api/status`        | any authenticated user | Current state: `{ status, uri, tag, containerState, lastHealth, info }`                        |
-| `GET /plugins/signalk-openwakeword/api/versions`      | any authenticated user | Available image versions from Docker Hub (feeds the config panel; works while plugin disabled) |
-| `GET /plugins/signalk-openwakeword/api/update/check`  | admin                  | Check whether a newer image is available                                                       |
-| `POST /plugins/signalk-openwakeword/api/update/apply` | admin                  | Pull and switch to the newer image                                                             |
+| Endpoint                                                      | Access                 | Purpose                                                                                        |
+| ------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------- |
+| `GET /plugins/signalk-openwakeword/api/status`                | any authenticated user | Current state: `{ status, uri, tag, containerState, lastHealth, info }`                        |
+| `GET /plugins/signalk-openwakeword/api/versions`              | any authenticated user | Available image versions from Docker Hub (feeds the config panel; works while plugin disabled) |
+| `GET /plugins/signalk-openwakeword/api/update/check`          | admin                  | Check whether a newer image is available                                                       |
+| `POST /plugins/signalk-openwakeword/api/update/apply`         | admin                  | Pull and switch to the newer image                                                             |
+| `GET /plugins/signalk-openwakeword/api/models`                | any authenticated user | Installed custom models, their wake word names, and whether each is live                       |
+| `POST /plugins/signalk-openwakeword/api/models`               | admin                  | Upload a model (raw body; `?filename=`, `?convert=true` to convert ONNX)                       |
+| `POST /plugins/signalk-openwakeword/api/models/:name/convert` | admin                  | Convert an already-uploaded `.onnx` to `.tflite`                                               |
+| `DELETE /plugins/signalk-openwakeword/api/models/:name`       | admin                  | Delete a custom model                                                                          |
+| `GET /plugins/signalk-openwakeword/api/train/config`          | admin                  | Phrase advice and a pre-filled training config (`?phrase=`)                                    |
+
+The model and training routes answer while the plugin is stopped — fixing a
+broken model is exactly when you need them.
 
 ## Health & notifications
 

@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { MockWyomingServer } from "signalk-wyoming/mock";
 import type { Plugin } from "@signalk/server-api";
 import createPlugin, {
@@ -29,7 +32,7 @@ afterEach(async () => {
 });
 
 interface RecordedRoute {
-  method: "get" | "post";
+  method: "get" | "post" | "delete";
   path: string;
   access: string | null;
   handler: (req: unknown, res: unknown) => unknown;
@@ -42,6 +45,8 @@ function makeRouter(): { router: PluginRouter; routes: RecordedRoute[] } {
       routes.push({ method: "get", path, access, handler }),
     post: (path: string, handler: RecordedRoute["handler"]) =>
       routes.push({ method: "post", path, access, handler }),
+    delete: (path: string, handler: RecordedRoute["handler"]) =>
+      routes.push({ method: "delete", path, access, handler }),
   });
   const router = {
     ...registrar(null),
@@ -52,7 +57,7 @@ function makeRouter(): { router: PluginRouter; routes: RecordedRoute[] } {
 
 function findRoute(
   routes: RecordedRoute[],
-  method: "get" | "post",
+  method: "get" | "post" | "delete",
   path: string,
 ): RecordedRoute {
   const route = routes.find((r) => r.method === method && r.path === path);
@@ -137,13 +142,19 @@ describe("registerWithRouter", () => {
     expect(findRoute(routes, "get", "/api/status").access).toBeNull();
   });
 
-  it("guards every route except /api/versions with the running flag", async () => {
+  it("guards the service routes with the running flag", async () => {
     plugin = createPlugin(createFakeApp(), FAST_TIMING);
     const { router, routes } = makeRouter();
     plugin.registerWithRouter(router);
+    // Deliberately unguarded: /api/versions feeds the version dropdown while
+    // the plugin is disabled, and the model/train routes exist so an operator
+    // can fix a broken custom model — which is done while it is down.
+    const unguarded = (path: string) =>
+      path === "/api/versions" ||
+      path.startsWith("/api/models") ||
+      path.startsWith("/api/train");
     for (const route of routes) {
-      // /api/versions is deliberately unguarded (see its test below).
-      if (route.path === "/api/versions") continue;
+      if (unguarded(route.path)) continue;
       const res = makeRes();
       await route.handler({}, res);
       expect(res.code).toBe(503);
@@ -259,5 +270,187 @@ describe("registerWithRouter", () => {
         statuses.at(-1) === "ready"
       );
     });
+  });
+});
+
+describe("custom model routes", () => {
+  let dataMount: string;
+
+  beforeEach(async () => {
+    dataMount = await fs.mkdtemp(path.join(os.tmpdir(), "oww-routes-"));
+  });
+
+  afterEach(async () => {
+    await fs.rm(dataMount, { recursive: true, force: true });
+  });
+
+  /** Register routes without starting the plugin (the disabled-plugin case). */
+  function setup() {
+    manager = installFakeManager({ dataMount });
+    const app = createFakeApp();
+    plugin = createPlugin(app, FAST_TIMING, async () => dataMount);
+    const { router, routes } = makeRouter();
+    plugin.registerWithRouter(router);
+    return { app, routes };
+  }
+
+  it("registers the model routes with sane access levels", () => {
+    const { routes } = setup();
+    // Listing is readonly so any authenticated user can see what is installed…
+    expect(findRoute(routes, "get", "/api/models").access).toBe("readonly");
+    // …while everything that mutates the boat's models is admin-only.
+    expect(findRoute(routes, "post", "/api/models").access).toBeNull();
+    expect(findRoute(routes, "delete", "/api/models/:name").access).toBeNull();
+    expect(
+      findRoute(routes, "post", "/api/models/:name/convert").access,
+    ).toBeNull();
+    expect(findRoute(routes, "get", "/api/train/config").access).toBeNull();
+  });
+
+  // Fixing a broken model is exactly what you do while the plugin is down, so
+  // these routes deliberately skip the running-flag guard the others use.
+  it("serves the model list while the plugin is stopped", async () => {
+    const { routes } = setup();
+    const res = makeRes();
+    await findRoute(routes, "get", "/api/models").handler({}, res);
+    expect(res.code).toBe(200);
+    expect(res.body).toMatchObject({ models: [], customModelsEnabled: false });
+  });
+
+  it("uploads a .tflite and reports the id wyoming will advertise", async () => {
+    const { routes } = setup();
+    const res = makeRes();
+    await findRoute(routes, "post", "/api/models").handler(
+      { query: { filename: "alexa_v0.1.tflite" }, body: Buffer.from("model") },
+      res,
+    );
+    expect(res.code).toBe(200);
+    expect(res.body).toMatchObject({
+      model: { id: "alexa", format: "tflite" },
+    });
+  });
+
+  it("rejects an upload whose filename would escape the model dir", async () => {
+    const { routes } = setup();
+    const res = makeRes();
+    await findRoute(routes, "post", "/api/models").handler(
+      { query: { filename: "../evil.tflite" }, body: Buffer.from("x") },
+      res,
+    );
+    expect(res.code).toBe(400);
+  });
+
+  it("rejects an upload with no file body", async () => {
+    const { routes } = setup();
+    const res = makeRes();
+    await findRoute(routes, "post", "/api/models").handler(
+      { query: { filename: "a.tflite" } },
+      res,
+    );
+    expect(res.code).toBe(400);
+    expect(String((res.body as { error: string }).error)).toMatch(
+      /raw request body/,
+    );
+  });
+
+  it("rejects an upload with a missing filename via schema validation", async () => {
+    const { routes } = setup();
+    const res = makeRes();
+    await findRoute(routes, "post", "/api/models").handler(
+      { query: {}, body: Buffer.from("x") },
+      res,
+    );
+    expect(res.code).toBe(400);
+  });
+
+  it("converts an uploaded .onnx and installs the result", async () => {
+    manager = installFakeManager({
+      dataMount,
+      runJob: async () => ({
+        id: "job",
+        status: "completed",
+        image: "x",
+        command: [],
+        exitCode: 0,
+        log: ['RESULT {"file": "hey_boat.tflite", "maxAbsDiff": 0}'],
+        createdAt: new Date(0).toISOString(),
+      }),
+    });
+    const app = createFakeApp();
+    plugin = createPlugin(app, FAST_TIMING, async () => dataMount);
+    const { router, routes } = makeRouter();
+    plugin.registerWithRouter(router);
+
+    const res = makeRes();
+    await findRoute(routes, "post", "/api/models").handler(
+      {
+        query: { filename: "hey_boat.onnx", convert: "true" },
+        body: Buffer.from("onnx"),
+      },
+      res,
+    );
+    expect(res.code).toBe(200);
+    expect(res.body).toMatchObject({
+      converted: { filename: "hey_boat.tflite", maxAbsDiff: 0 },
+    });
+  });
+
+  it("refuses to convert something that is not an .onnx", async () => {
+    const { routes } = setup();
+    const res = makeRes();
+    await findRoute(routes, "post", "/api/models/:name/convert").handler(
+      { params: { name: "a.tflite" } },
+      res,
+    );
+    expect(res.code).toBe(400);
+  });
+
+  it("404s converting a model that is not installed", async () => {
+    const { routes } = setup();
+    const res = makeRes();
+    await findRoute(routes, "post", "/api/models/:name/convert").handler(
+      { params: { name: "missing.onnx" } },
+      res,
+    );
+    expect(res.code).toBe(404);
+  });
+
+  it("deletes a model", async () => {
+    const { routes } = setup();
+    const upload = makeRes();
+    await findRoute(routes, "post", "/api/models").handler(
+      { query: { filename: "a.tflite" }, body: Buffer.from("x") },
+      upload,
+    );
+    const res = makeRes();
+    await findRoute(routes, "delete", "/api/models/:name").handler(
+      { params: { name: "a.tflite" } },
+      res,
+    );
+    expect(res.body).toEqual({ ok: true });
+  });
+
+  it("returns a pre-filled training plan for a phrase", async () => {
+    const { routes } = setup();
+    const res = makeRes();
+    await findRoute(routes, "get", "/api/train/config").handler(
+      { query: { phrase: "hey seabird" } },
+      res,
+    );
+    expect(res.code).toBe(200);
+    expect(res.body).toMatchObject({
+      slug: "hey_seabird",
+      modelId: "hey_seabird",
+    });
+  });
+
+  it("rejects a training request with no phrase", async () => {
+    const { routes } = setup();
+    const res = makeRes();
+    await findRoute(routes, "get", "/api/train/config").handler(
+      { query: {} },
+      res,
+    );
+    expect(res.code).toBe(400);
   });
 });

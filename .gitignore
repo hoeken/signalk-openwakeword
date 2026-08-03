@@ -2,5 +2,6 @@
 dist/
 public/
 node_modules/
+test/screenshots/
 *.log
 .DS_Store

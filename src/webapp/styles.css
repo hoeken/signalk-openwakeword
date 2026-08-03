@@ -1,0 +1,403 @@
+/*
+ * Standalone webapp styles.
+ *
+ * A real stylesheet is fine here — the inline-style rule that governs the
+ * config panel exists because a Module Federation remote's CSS leaks into (and
+ * is clobbered by) the host Admin UI page. This webapp owns its own document.
+ *
+ * Boats are used in bright sun and at night, so both colour schemes are
+ * first-class and the type stays large enough to read on a moving deck.
+ */
+
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --border: #d9dee6;
+  --text: #1a2028;
+  --muted: #5d6b7a;
+  --accent: #0a6ed1;
+  --accent-text: #ffffff;
+  --ok: #1d7a4c;
+  --ok-bg: #e6f4ec;
+  --warn: #8a5a00;
+  --warn-bg: #fdf3e2;
+  --error: #b3261e;
+  --error-bg: #fdecea;
+  --info-bg: #e8f1fb;
+  --radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181d;
+    --surface: #1c2228;
+    --border: #333c46;
+    --text: #e8ecf1;
+    --muted: #9aa7b4;
+    --accent: #4d9fe8;
+    --accent-text: #0b1116;
+    --ok: #6ed49b;
+    --ok-bg: #16301f;
+    --warn: #e8b25c;
+    --warn-bg: #332714;
+    --error: #f2867d;
+    --error-bg: #331a18;
+    --info-bg: #16212e;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    16px/1.55 system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+main {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 4rem;
+}
+
+header {
+  margin-bottom: 1.5rem;
+}
+h1 {
+  font-size: 1.6rem;
+  margin: 0 0 0.25rem;
+}
+h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.75rem;
+}
+.lede {
+  color: var(--muted);
+  margin: 0;
+}
+
+section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1.1rem;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: color-mix(in srgb, var(--border) 45%, transparent);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+/* Tables ------------------------------------------------------------- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  text-align: left;
+  padding: 0.6rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+tbody tr:last-child td {
+  border-bottom: none;
+}
+.numeric {
+  text-align: right;
+}
+td.actions,
+th.actions {
+  text-align: right;
+  white-space: nowrap;
+}
+td.actions button + button {
+  margin-left: 0.4rem;
+}
+.model-id {
+  background: none;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.filename {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.status {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.status.ok {
+  color: var(--ok);
+}
+.status.warn {
+  color: var(--warn);
+}
+.status.muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* Buttons ------------------------------------------------------------ */
+button,
+.button {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.42rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+button:hover:not(:disabled),
+.button:hover {
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button.primary,
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+button.danger:hover:not(:disabled) {
+  border-color: var(--error);
+  color: var(--error);
+}
+.icon-button {
+  border: none;
+  background: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 0 0.3rem;
+  color: var(--muted);
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Notices ------------------------------------------------------------ */
+.notice {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+}
+.notice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.notice.ok,
+.notice.success {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: currentColor;
+}
+.notice.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: currentColor;
+}
+.notice.error {
+  background: var(--error-bg);
+  color: var(--error);
+  border-color: currentColor;
+}
+.notice.info {
+  background: var(--info-bg);
+  border-color: var(--border);
+}
+.notice .detail,
+.config {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0.35rem 0 0;
+  opacity: 0.85;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.87rem;
+}
+.muted {
+  color: var(--muted);
+}
+.empty {
+  color: var(--muted);
+  padding: 1rem 0;
+}
+
+/* Dropzone ----------------------------------------------------------- */
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1rem;
+  text-align: center;
+  cursor: pointer;
+}
+.dropzone:hover,
+.dropzone.dragging {
+  border-color: var(--accent);
+  background: var(--info-bg);
+}
+.dropzone p {
+  margin: 0.3rem 0;
+}
+
+/* Modal -------------------------------------------------------------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+  overflow-y: auto;
+  z-index: 10;
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  width: min(38rem, 100%);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h2 {
+  margin: 0;
+}
+.modal-body {
+  padding: 1.1rem;
+}
+.modal-body label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.modal-body input[type="text"] {
+  font: inherit;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.2rem;
+}
+.row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.config {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.7rem 0.8rem;
+  overflow-x: auto;
+}
+
+/* Wizard steps ------------------------------------------------------- */
+.steps {
+  display: flex;
+  gap: 1.2rem;
+  list-style: none;
+  margin: 0;
+  padding: 0.8rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.steps .current {
+  color: var(--text);
+  font-weight: 600;
+}
+.steps .done {
+  color: var(--ok);
+}
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 40rem) {
+  th:nth-child(2),
+  td:nth-child(2),
+  th:nth-child(3),
+  td:nth-child(3) {
+    display: none;
+  }
+  main {
+    padding: 1rem 0.75rem 3rem;
+  }
+}

@@ -5,22 +5,28 @@ the plugin. User-facing documentation lives in [README.md](README.md).
 
 ## Code layout
 
-| Path               | Contents                                                                                                          |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `src/index.ts`     | Plugin entry point: schema, start/stop, HTTP routes (`registerWithRouter`), admin guard for the update endpoints  |
-| `src/config.ts`    | Settings schema, validation, and derivation of the container spec from settings (`IMAGE`, `PINNED_TAG` live here) |
-| `src/service.ts`   | Container lifecycle, readiness gate, health-check loop, and `wyoming-service` discovery emission                  |
-| `src/wyoming.ts`   | Embedded Wyoming `describe` client (~170 lines) — raw TCP, JSONL header framing                                   |
-| `src/configpanel/` | React source for the Admin UI configuration panel (built into `public/`)                                          |
-| `test/`            | Vitest suites + fixtures                                                                                          |
-| `public/`          | Built config-panel bundle (webpack output, shipped in the npm package via `files`)                                |
+| Path                | Contents                                                                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `src/index.ts`      | Plugin entry point: schema, start/stop, HTTP routes (`registerWithRouter`), admin guard for the update endpoints  |
+| `src/config.ts`     | Settings schema, validation, and derivation of the container spec from settings (`IMAGE`, `PINNED_TAG` live here) |
+| `src/service.ts`    | Container lifecycle, readiness gate, health-check loop, and `wyoming-service` discovery emission                  |
+| `src/wyoming.ts`    | Embedded Wyoming `describe` client (~170 lines) — raw TCP, JSONL header framing                                   |
+| `src/models.ts`     | Custom-model store: the `custom/` dir, model-id derivation, filename sanitization, atomic install                 |
+| `src/convert.ts`    | ONNX → TFLite conversion as a one-shot container job, with numerical validation                                   |
+| `src/train.ts`      | Wake-phrase advice and the pre-filled Colab training config                                                       |
+| `src/api-schema.ts` | TypeBox request contracts for the model/train routes                                                              |
+| `src/configpanel/`  | React source for the Admin UI configuration panel (built into `public/`)                                          |
+| `src/webapp/`       | React + zustand "Custom wake words" webapp (built into `public/` by vite)                                         |
+| `test/`             | Vitest suites + fixtures                                                                                          |
+| `public/`           | Built config-panel bundle **and** webapp (shipped in the npm package via `files`) — see the coexistence note      |
 
 ## Commands
 
 ```sh
 npm install
-npm run build                 # tsc → dist/, then webpack → public/ (config panel)
+npm run build                 # tsc → dist/, webpack → public/ (panel), vite → public/ (webapp)
 npm test                      # typecheck (tsconfig.test.json) + vitest
+npm run test:e2e              # build, then drive the webapp in headless chromium
 npm run test:watch            # vitest watch mode
 npm run ci-lint               # eslint + prettier --check
 npm run format                # prettier + eslint --fix
@@ -107,8 +113,68 @@ appends `--custom-model-dir /data/custom` to the container command.
 directory (`plugin-config-data/signalk-container/`, shared by every plugin
 that uses it), _not_ to this plugin's `plugin-config-data/signalk-openwakeword/`
 directory — the mount is provided by signalk-container, which only knows
-its own directory. Upstream strips a `_v1.0`-style filename suffix when
-deriving the model id.
+its own directory.
+
+`src/models.ts` is the single source of truth for that path on the host
+side: it resolves the same directory via the manager's
+`resolveSignalkDataMount()`, so the container's `/data/custom` and the
+host's `custom/` can never drift apart. It also creates the directory,
+which nothing used to do.
+
+**Model id derivation has a sharp edge.** Upstream's regex is
+`^([^_]+)_v[0-9.]+$` — `[^_]+` forbids underscores, so a version suffix is
+stripped only from single-token names. `alexa_v0.1` → `alexa`, but
+`hey_boat_v1` stays `hey_boat_v1` in full. `modelId()` reproduces this
+exactly rather than prettifying, because the UI must show the name wyoming
+will really advertise. Do not "fix" it to strip more.
+
+### ONNX → TFLite conversion
+
+wyoming-openwakeword 2.x globs `*.tflite` and runs it through
+`libtensorflowlite_c` via ctypes; there is no ONNX code path and no config
+flag that adds one. Meanwhile every maintained training notebook exports
+ONNX. `src/convert.ts` bridges the two as a one-shot `runJob` container
+(`pinto0309/onnx2tf`, multi-arch including arm64) so the ~1 GB toolchain is
+never a plugin dependency — it is pulled the first time someone converts
+something.
+
+Two things in there are load-bearing and must not be simplified away:
+
+1. **The pre-transpose.** onnx2tf reads a 3D input as NCW and "corrects" it
+   to NWC, turning a `(1,16,96)` openWakeWord model into a `(1,96,16)`
+   tflite. Nothing errors; the model just scores garbage forever. The
+   documented overrides (`-k`, `-kt`, `-kat`, `-ois`) do not stop it. The
+   script therefore inserts a `Transpose` at the graph input so onnx2tf's
+   own swap lands back on the original layout.
+2. **The numerical check.** The converted model is run against onnxruntime
+   on random inputs and rejected unless the outputs match. This is what
+   catches (1) if upstream ever changes behaviour, and it also catches
+   unresolved custom ops — some older community models carry a legacy
+   conditional `If`/verifier branch that only fails at `allocate_tensors()`.
+   Those files are also rejected by onnxruntime as invalid graphs, so they
+   are reported as broken sources rather than converter bugs.
+
+Training is deliberately **not** implemented: it needs ~17 GB of
+precomputed features and a CUDA GPU, so `src/train.ts` generates a
+pre-filled Colab config instead of pretending a Pi can do it.
+
+### public/ is shared — both builds must not clean it
+
+Signal K serves a package's `public/` as the webapp root (see
+`mountWebModules` in the server's `src/interfaces/webapps.ts`), and this
+package also emits its Module Federation panel there. They coexist as plain
+static files, which only works because **`output.clean: false` in
+`webpack.config.cjs` and `emptyOutDir: false` in `vite.config.js`**. Flip
+either to true and one build silently deletes the other's output.
+
+Webapp assets are namespaced under `public/owwapp/` so a vite chunk can
+never collide with a federation chunk. After changing either build, verify
+the remote still loads:
+
+```sh
+node -e 'import("./public/remoteEntry.js").then(m => console.log(typeof m.get, typeof m.init))'
+# must print: function function
+```
 
 ### Config panel build
 

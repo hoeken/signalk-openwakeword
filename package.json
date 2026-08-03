@@ -12,9 +12,10 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc && webpack",
+    "build": "tsc && webpack && vite build",
     "test": "npm run typecheck:test && vitest run",
     "test:watch": "vitest",
+    "test:e2e": "npm run build && node test/e2e.mjs",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc --noEmit --project tsconfig.test.json",
     "prettier": "prettier --write .",
@@ -35,6 +36,7 @@
   "keywords": [
     "signalk-node-server-plugin",
     "signalk-plugin-configurator",
+    "signalk-webapp",
     "signalk-category-utility",
     "wyoming",
     "openwakeword",
@@ -50,6 +52,7 @@
   },
   "signalk": {
     "displayName": "openWakeWord (Wyoming)",
+    "appIcon": "./owwapp-icon.svg",
     "requires": [
       "signalk-container"
     ],
@@ -63,14 +66,17 @@
     "node": ">=24"
   },
   "dependencies": {
+    "@sinclair/typebox": "^0.34.52",
     "signalk-container-helper": "^0.2.1"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@babel/preset-react": "^7.28.5",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@signalk/server-api": "^2.30.0",
     "@types/node": "^24.0.0",
+    "@vitejs/plugin-react": "^6.0.5",
     "babel-loader": "^10.1.1",
     "eslint": "^10.2.0",
     "eslint-config-prettier": "^10.1.8",
@@ -83,8 +89,10 @@
     "signalk-wyoming": "^0.1.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.58.0",
+    "vite": "^8.2.0",
     "vitest": "^4.1.10",
     "webpack": "^5.105.4",
-    "webpack-cli": "^7.0.2"
+    "webpack-cli": "^7.0.2",
+    "zustand": "^5.0.14"
   }
 }

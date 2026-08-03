@@ -18,6 +18,41 @@ export const CONTAINER_NAME = "openwakeword";
 export const SERVICE_NAME = "openwakeword";
 
 /**
+ * ONNX → TFLite converter image, run as a one-shot job (never long-lived).
+ * Multi-arch including linux/arm64, so conversion works on a Pi — the old
+ * `onnx-tf` route did not, because it needed tensorflow 2.8.1, which has no
+ * aarch64 wheels at all. Pulled on first use only.
+ */
+export const CONVERTER_IMAGE = "pinto0309/onnx2tf";
+export const CONVERTER_TAG = "2.6.8";
+/** Hard ceiling on a conversion job; real conversions take a few seconds. */
+export const CONVERT_TIMEOUT_SECONDS = 600;
+
+/**
+ * Subdirectory of the shared signalk-container data dir that
+ * wyoming-openwakeword scans when `advanced.customModels` is on. The
+ * container sees it as `/data/custom` (see buildCommand).
+ */
+export const CUSTOM_MODEL_DIRNAME = "custom";
+
+/**
+ * Model file formats the plugin accepts. Only `tflite` is loadable:
+ * wyoming-openwakeword 2.x globs `*.tflite` and runs them through
+ * libtensorflowlite_c, with no ONNX code path at all. `onnx` is accepted
+ * purely as a conversion *source*, because the maintained training notebooks
+ * emit ONNX.
+ */
+export type ModelFormat = "tflite" | "onnx";
+/** Container-side path of CUSTOM_MODEL_DIRNAME under signalkDataMount. */
+export const CUSTOM_MODEL_CONTAINER_DIR = "/data/custom";
+
+/**
+ * Upload ceiling. Real openWakeWord models are 200 KB–1.3 MB; the cap only
+ * exists to keep a stray upload from filling the boat's SD card.
+ */
+export const MAX_MODEL_BYTES = 16 * 1024 * 1024;
+
+/**
  * Wake word models bundled with wyoming-openwakeword 2.x. Note the 2.0.0
  * breaking rename: `ok_nabu` → `okay_nabu`.
  */
