@@ -82,7 +82,13 @@ export interface FakeManagerHandle {
 }
 
 export function installFakeManager(
-  options: { address?: string | null } = {},
+  options: {
+    address?: string | null;
+    /** Result (or thrower) for the one-shot conversion job. */
+    runJob?: (config: unknown) => Promise<unknown>;
+    /** Host dir reported as the shared signalk-container data mount. */
+    dataMount?: string | null;
+  } = {},
 ): FakeManagerHandle {
   const calls: FakeCall[] = [];
   const handle: FakeManagerHandle = {
@@ -119,6 +125,20 @@ export function installFakeManager(
     resolveContainerAddress: async (name: string, port: number) => {
       calls.push({ method: "resolveContainerAddress", args: [name, port] });
       return handle.address;
+    },
+    resolveSignalkDataMount: async () => options.dataMount ?? null,
+    runJob: async (config: unknown) => {
+      calls.push({ method: "runJob", args: [config] });
+      if (options.runJob !== undefined) return options.runJob(config);
+      return {
+        id: "job-test",
+        status: "completed",
+        image: "test",
+        command: [],
+        exitCode: 0,
+        log: [],
+        createdAt: new Date(0).toISOString(),
+      };
     },
     updates: {
       register: (reg: unknown) => {

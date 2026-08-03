@@ -317,6 +317,16 @@ export class ServiceRunner {
     }
   }
 
+  /**
+   * Restore the resting status line. Used after a transient message (a model
+   * conversion) so the plugin status doesn't stay stuck on it.
+   */
+  refreshStatus(): void {
+    if (this.status === "ready") {
+      this.app.setPluginStatus(this.runningStatusLine());
+    }
+  }
+
   /** Payload for GET /api/status. */
   async statusReport(): Promise<Record<string, unknown>> {
     return {

@@ -1,3 +1,28 @@
+# Unreleased
+
+Nothing to reconfigure — existing settings carry over unchanged.
+
+- **New "Custom wake words" webapp.** Teaching the boat to answer to its
+  own name no longer means ssh and a hand-made directory inside another
+  plugin's data folder. Open it from the Webapps menu to see what is
+  installed, add models by drag and drop, and delete ones you no longer
+  want. It tells you the wake word name the service will actually
+  advertise, and flags the two things that used to fail silently: a model
+  sitting there while custom models are switched off, and a model that
+  hasn't been converted yet.
+- **ONNX models are converted for you.** The wake word service only loads
+  `.tflite`, but every current training notebook produces `.onnx` — which
+  is why so many trained models never worked. Drop the `.onnx` in and the
+  plugin converts it on the server, then checks the result against the
+  original before installing it, so a model that converted incorrectly is
+  rejected instead of quietly mis-hearing you. Works on a Raspberry Pi.
+- **Guided wake word creation.** "Create a wake word" takes a phrase, tells
+  you whether it will work well (short or everyday phrases false-trigger
+  constantly), fills in the training config, and hands you a link to the
+  notebook. Training itself runs on a free Google Colab GPU and takes about
+  an hour — it can't run on the Signal K server, and the wizard says so
+  plainly rather than pretending otherwise.
+
 # v0.2.0
 
 Nothing to reconfigure — existing settings carry over unchanged. The plugin

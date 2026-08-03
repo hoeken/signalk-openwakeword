@@ -361,7 +361,16 @@ export default function PluginConfigurationPanel({ configuration, save }) {
         </FieldRow>
         <FieldRow
           label="Custom wake word models"
-          hint="load .tflite files from plugin-config-data/signalk-container/custom/ (--custom-model-dir)"
+          hint={
+            <>
+              load your own wake words (--custom-model-dir). Add, train and
+              convert them in the{" "}
+              <a href="/signalk-openwakeword/" target="_blank" rel="noreferrer">
+                Custom wake words
+              </a>{" "}
+              webapp.
+            </>
+          }
         >
           <input
             style={S.checkbox}
