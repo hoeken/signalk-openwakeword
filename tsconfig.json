@@ -17,5 +17,9 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The webapp is a browser bundle built by vite, not part of dist/. It is
+  // typechecked separately (tsconfig.webapp.json) so it gets DOM libs instead
+  // of Node ones — and so `tsc` never emits it into dist/.
+  "exclude": ["src/webapp"]
 }

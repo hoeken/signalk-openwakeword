@@ -19,22 +19,17 @@ import {
   MAX_MODEL_BYTES,
   type ModelFormat,
 } from "./config.js";
+import type { Model } from "./api-schema.js";
 
-/** A model file on disk, as the webapp sees it. */
-export interface StoredModel {
-  /** Filename including extension, e.g. "hey_boat_v1.tflite". */
-  filename: string;
-  /**
-   * The id wyoming-openwakeword will actually advertise — what the user must
-   * put in `wakeWords`. See modelId() for the underscore trap.
-   */
-  id: string;
-  format: ModelFormat;
-  bytes: number;
-  modifiedAt: string;
-  /** True when a `<id>.tflite` sibling exists (an .onnx already converted). */
-  converted?: boolean;
-}
+/**
+ * A model file on disk. Derived from the shared API schema so the store, the
+ * route payload and the webapp all describe the same object.
+ *
+ * `id` is the name wyoming-openwakeword will actually advertise — what the
+ * user must put in `wakeWords`. See modelId() for the underscore trap.
+ * `converted` is set on .onnx entries when a `<id>.tflite` sibling exists.
+ */
+export type StoredModel = Omit<Model, "live" | "selected">;
 
 /**
  * Reproduces wyoming-openwakeword's own id derivation
