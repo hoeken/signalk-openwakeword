@@ -1,0 +1,21 @@
+{
+  // Typecheck for the vite-built webapp. Separate from the main config because
+  // this code runs in a browser: it needs DOM libs (fetch, File, Response) and
+  // must never be emitted into dist/ alongside the plugin.
+  //
+  // It pulls in src/api-schema.ts, so the request/response contracts the server
+  // validates against are the same ones the UI is typechecked against.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["src/webapp", "src/api-schema.ts", "src/config.ts"],
+  "exclude": []
+}

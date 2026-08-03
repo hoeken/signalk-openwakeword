@@ -14,7 +14,7 @@ the plugin. User-facing documentation lives in [README.md](README.md).
 | `src/models.ts`     | Custom-model store: the `custom/` dir, model-id derivation, filename sanitization, atomic install                 |
 | `src/convert.ts`    | ONNX → TFLite conversion as a one-shot container job, with numerical validation                                   |
 | `src/train.ts`      | Wake-phrase advice and the pre-filled Colab training config                                                       |
-| `src/api-schema.ts` | TypeBox request contracts for the model/train routes                                                              |
+| `src/api-schema.ts` | TypeBox contracts for the model/train API — imported by BOTH the routes and the webapp                            |
 | `src/configpanel/`  | React source for the Admin UI configuration panel (built into `public/`)                                          |
 | `src/webapp/`       | React + zustand "Custom wake words" webapp (built into `public/` by vite)                                         |
 | `test/`             | Vitest suites + fixtures                                                                                          |
@@ -157,6 +157,36 @@ Two things in there are load-bearing and must not be simplified away:
 Training is deliberately **not** implemented: it needs ~17 GB of
 precomputed features and a CUDA GPU, so `src/train.ts` generates a
 pre-filled Colab config instead of pretending a Pi can do it.
+
+### One API contract, shared by the server and the webapp
+
+`src/api-schema.ts` defines the model/train request and response shapes once
+with **TypeBox 1.x**, and both sides import it:
+
+- the routes in `src/index.ts` validate incoming queries with `parse()`;
+- the webapp store (`src/webapp/store.ts`) validates the responses it gets
+  back with `Check()`, and its state types are `Static<>` derivations of the
+  same schemas.
+
+`StoredModel` in `src/models.ts` and `TrainingPlan` in `src/train.ts` are
+likewise derived from those schemas rather than declared separately, so a
+change to the wire format cannot silently diverge from the code on either end.
+
+Two notes on the dependency:
+
+- It is the **unscoped `typebox` package** (1.x), not `@sinclair/typebox`
+  (the 0.x LTS line that signalk-server's `server-api` still depends on).
+  They are different packages; don't mix them up when reading the docs.
+- 1.x is **ESM-only** — fine here, since this package is `"type": "module"`
+  and vite wants ESM for the browser bundle anyway. The value functions are
+  named exports (`Check`, `Convert`, `Errors`), not the 0.x `Value.*`
+  namespace, and `Errors()` yields a union in which only some members carry a
+  `path`.
+
+The webapp is typechecked by its own `tsconfig.webapp.json` (`npm run
+typecheck:webapp`, part of `npm test`) because it needs DOM libs rather than
+Node ones, and because the main `tsconfig.json` must not emit browser code
+into `dist/`.
 
 ### public/ is shared — both builds must not clean it
 

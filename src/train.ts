@@ -11,23 +11,18 @@
  * comes back — and hand off the GPU step to Colab.
  */
 
+import type { TrainingPlanResponse } from "./api-schema.js";
+
 export interface PhraseAdvice {
   level: "ok" | "warn";
   message: string;
 }
 
-export interface TrainingPlan {
-  phrase: string;
-  /** Filesystem/model-id-safe slug derived from the phrase. */
-  slug: string;
-  /** The id wyoming will advertise once the model is installed. */
-  modelId: string;
-  notebookUrl: string;
-  advice: PhraseAdvice[];
-  /** YAML-ish config block the notebook accepts, pre-filled. */
-  config: string;
-  steps: string[];
-}
+/**
+ * Derived from the shared schema rather than declared separately, so what this
+ * module builds and what the webapp consumes cannot drift apart.
+ */
+export type TrainingPlan = TrainingPlanResponse;
 
 /**
  * The community-maintained 2026 trainer. Chosen over dscripka's own notebook
