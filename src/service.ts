@@ -35,6 +35,15 @@ export interface WyomingServiceValue {
   type: "wake";
   uri: string | null;
   status: ServiceStatus;
+  /**
+   * The boat's configured wake words, so the orchestrator can wire satellites
+   * without the operator retyping them per satellite. SPEC §3.1 allows extra
+   * fields and consumers ignore what they don't know, so this is additive.
+   *
+   * Omitted when nothing is configured — an empty list would be
+   * indistinguishable from "deliberately none" on the consumer side.
+   */
+  wakeWords?: string[];
 }
 
 /** The slice of the Signal K plugin `app` object this module uses. */
@@ -91,6 +100,13 @@ function sleep(ms: number): Promise<void> {
 export class StatusEmitter {
   /** Advertised URI; emissions (except 'stopped') are held until it is set. */
   uri: string | null = null;
+
+  /**
+   * Wake words advertised alongside the URI, so the orchestrator can wire
+   * satellites without the operator configuring them twice. Settable because
+   * the runner re-reads settings on every start.
+   */
+  wakeWords: string[] = [];
 
   private lastStatus: ServiceStatus | null = null;
   private lastEmitAt = Number.NEGATIVE_INFINITY;
@@ -187,6 +203,7 @@ export class StatusEmitter {
       type: "wake",
       uri: this.uri,
       status,
+      ...(this.wakeWords.length > 0 ? { wakeWords: [...this.wakeWords] } : {}),
     };
     try {
       this.app.emitPropertyValue("wyoming-service", value);
@@ -245,6 +262,9 @@ export class ServiceRunner {
       this.timing.flapWindowMs,
       this.timing.flapLimit,
     );
+    // Advertised so signalk-wyoming can wire satellites from this one setting
+    // instead of the operator repeating it per satellite.
+    this.emitter.wakeWords = settings.wakeWords;
   }
 
   /**
