@@ -127,6 +127,18 @@ Pick something distinctive with three or more syllables. openWakeWord
 matches on sound, so an everyday phrase will wake the boat in the middle of
 normal conversation.
 
+The wizard links to [our own copy of the training
+notebook](notebooks/train_wakeword.ipynb). openWakeWord's official notebook
+has been broken for a long time, and the community fork that replaced it has
+since developed two failures of its own — both of which waste about forty
+minutes before they show up. Ours carries the fixes. If you would rather use
+a different notebook, set `advanced.notebookUrl`.
+
+Two things that will save you an afternoon: switch the Colab runtime to a
+**GPU** before you start (on CPU it runs for hours and then gets
+disconnected), and leave the tab open, because Colab wipes everything if the
+session drops.
+
 ### Wake word names
 
 The name you put in `wakeWords` is derived from the filename, and the rule

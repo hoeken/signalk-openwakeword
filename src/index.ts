@@ -47,7 +47,7 @@ import {
   TrainConfigQuerySchema,
   UploadQuerySchema,
 } from "./api-schema.js";
-import { buildTrainingPlan } from "./train.js";
+import { buildTrainingPlan, NOTEBOOK_URL } from "./train.js";
 import { wakeModelNames } from "./wyoming.js";
 
 export interface PluginApp extends ServiceApp {
@@ -429,7 +429,12 @@ export default function createPlugin(
           res.status(400).json({ error: describeErrors(parsed.errors) });
           return;
         }
-        res.json(buildTrainingPlan(parsed.value.phrase));
+        res.json(
+          buildTrainingPlan(
+            parsed.value.phrase,
+            settings.advanced.notebookUrl ?? NOTEBOOK_URL,
+          ),
+        );
       });
 
       // Version-dropdown feed for the config panel. Deliberately not

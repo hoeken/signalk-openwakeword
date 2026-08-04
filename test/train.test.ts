@@ -67,6 +67,19 @@ describe("buildTrainingPlan", () => {
     expect(plan.modelId).not.toMatch(/_v\d/);
   });
 
+  // We ship our own fork because the widely-shared notebook has two
+  // failures that each cost ~40 minutes before surfacing.
+  it("links our maintained fork by default", () => {
+    expect(buildTrainingPlan("hey seabird").notebookUrl).toContain(
+      "signalk-openwakeword/blob/main/notebooks/train_wakeword.ipynb",
+    );
+  });
+
+  it("honours an overridden notebook URL", () => {
+    const plan = buildTrainingPlan("hey seabird", "https://example.test/nb");
+    expect(plan.notebookUrl).toBe("https://example.test/nb");
+  });
+
   it("links a notebook and says the result is an .onnx file", () => {
     const plan = buildTrainingPlan("hey seabird");
     expect(plan.notebookUrl).toMatch(

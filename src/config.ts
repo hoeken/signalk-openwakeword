@@ -88,6 +88,12 @@ export interface AdvancedSettings {
   customModels: boolean;
   /** Replaces the host part of the advertised wyoming-service uri. */
   advertiseHost?: string;
+  /**
+   * Override the training-notebook link shown in the webapp. The default is
+   * our own fork; this exists so a future breakage is a settings change
+   * rather than waiting on a plugin release.
+   */
+  notebookUrl?: string;
 }
 
 export interface OpenWakeWordSettings {
@@ -156,6 +162,11 @@ export function withDefaults(raw: unknown): OpenWakeWordSettings {
   const advertiseHost = str(adv.advertiseHost);
   if (advertiseHost !== undefined && advertiseHost.trim() !== "") {
     settings.advanced.advertiseHost = advertiseHost.trim();
+  }
+  const notebookUrl = str(adv.notebookUrl);
+  // Only https, so a bad value can't turn the wizard's link into javascript:.
+  if (notebookUrl !== undefined && /^https:\/\//i.test(notebookUrl.trim())) {
+    settings.advanced.notebookUrl = notebookUrl.trim();
   }
   return settings;
 }
@@ -351,6 +362,15 @@ export const CONFIG_SCHEMA = {
             "subdirectory (--custom-model-dir /data/custom). Drop model " +
             "files into plugin-config-data/signalk-container/custom/ (NOT " +
             "this plugin's own data directory) and restart the plugin.",
+        },
+        notebookUrl: {
+          type: "string",
+          title: "Training notebook URL",
+          description:
+            "Overrides the Colab notebook the Custom wake words webapp links " +
+            "to for training. Defaults to the fork maintained with this " +
+            "plugin. Must be https://. Only useful if that notebook breaks " +
+            "and a better one exists before the next plugin release.",
         },
         advertiseHost: {
           type: "string",

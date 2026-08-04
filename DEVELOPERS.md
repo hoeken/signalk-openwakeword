@@ -17,6 +17,7 @@ the plugin. User-facing documentation lives in [README.md](README.md).
 | `src/api-schema.ts` | TypeBox contracts for the model/train API — imported by BOTH the routes and the webapp                            |
 | `src/configpanel/`  | React source for the Admin UI configuration panel (built into `public/`)                                          |
 | `src/webapp/`       | React + zustand "Custom wake words" webapp (built into `public/` by vite)                                         |
+| `notebooks/`        | Forked Colab training notebook — the only component with no CI; see its section below                             |
 | `test/`             | Vitest suites + fixtures                                                                                          |
 | `public/`           | Built config-panel bundle **and** webapp (shipped in the npm package via `files`) — see the coexistence note      |
 
@@ -187,6 +188,37 @@ away:
 `npm run test:e2e:live` exercises all four against a running server —
 uploading a real community model, converting a real ONNX one, and asserting
 wyoming-openwakeword actually advertises them.
+
+### The forked training notebook
+
+`notebooks/train_wakeword.ipynb` is a fork of
+[alfiedennen/openwakeword-colab-2026](https://github.com/alfiedennen/openwakeword-colab-2026),
+which is itself a repair of dscripka's original (that one still imports the
+dead `onnx_tf`). We forked because the community version has two failures on
+current Colab, and both of them waste ~40 minutes before surfacing — the run
+generates positive clips fine, then dies at the negatives:
+
+| Patch        | Fixes                                                                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| install cell | `deep-phonemizer` — provides the `dp` module openwakeword's `data.py` imports for adversarial negatives. Upstream never installs it.        |
+| **G**        | torch ≥ 2.6 defaults `torch.load` to `weights_only=True` and refuses dp's checkpoint, which pickles a `Preprocessor`. Rewrites dp's loader. |
+| **H**        | `add_safe_globals` allowlist as a second line of defence.                                                                                   |
+| pre-flight   | Hard-fails on a CPU runtime. Upstream prints CUDA status and carries on, so "Run all" trains for hours and then disconnects.                |
+
+Patch G is applied in **Python, not `sed`**, deliberately: the upstream patches
+use `sed`, which silently no-ops if whitespace drifts, and G then asserts its
+own result. That failure mode cost real time to diagnose.
+
+**This is the one component with no CI.** A Colab notebook can only be
+verified by running it — ~90 minutes of GPU time, by hand. `test/notebook.test.ts`
+therefore asserts that the _reasons we forked_ are still present, so a re-sync
+with upstream cannot quietly drop them. It cannot tell you the notebook still
+trains; only that our fixes survived.
+
+Fixes are offered back upstream at
+[issue #1](https://github.com/alfiedennen/openwakeword-colab-2026/issues/1). If
+they land, drop the fork and point `NOTEBOOK_URL` back. Users can already
+override it via `advanced.notebookUrl` without waiting for a release.
 
 ### One API contract, shared by the server and the webapp
 

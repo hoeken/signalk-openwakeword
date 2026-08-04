@@ -180,22 +180,19 @@ export default function TrainWizard({ onClose }) {
             <details className="troubleshoot">
               <summary>If it stops with an error part-way through</summary>
               <p className="hint">
-                Two known gaps in that notebook, both in the clip-generation
-                step and both leaving 0 negative clips. Add a cell above it with
-                the fixes, run that, then re-run the cell that failed — work
-                already done is cached, so it resumes where it stopped.
+                This link points at a notebook maintained alongside this plugin,
+                with fixes for the two failures the widely-shared one still has.
+                If you are using a different copy and it dies during clip
+                generation with <code>No module named 'dp'</code> or{" "}
+                <code>Weights only load failed</code>, that is why — use ours.
               </p>
               <p className="hint">
-                For <code>No module named 'dp'</code>:
+                Colab also clears everything if the session disconnects, which
+                it does when a tab is left idle. If you come back to{" "}
+                <code>No such file or directory: my_model.yaml</code>, the
+                session was recycled and it has to start over — so keep the tab
+                open while it runs.
               </p>
-              <pre className="config">!pip install -q deep-phonemizer</pre>
-              <p className="hint">
-                Then, for <code>UnpicklingError: Weights only load failed</code>{" "}
-                (newer PyTorch refusing an older checkpoint):
-              </p>
-              <pre className="config">
-                {`!sed -i 's|checkpoint = torch.load(checkpoint_path, map_location=device)|checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)|' /usr/local/lib/python3.12/dist-packages/dp/model/model.py`}
-              </pre>
             </details>
             <div className="row">
               <button onClick={copyConfig}>
