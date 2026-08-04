@@ -191,11 +191,6 @@ export default function TrainWizard({ onClose }) {
               <button onClick={copyConfig}>
                 {copied ? "Copied" : "Copy these lines"}
               </button>
-              <p className="hint">
-                Other copies also still have two bugs ours fixes:{" "}
-                <code>No module named 'dp'</code> and{" "}
-                <code>Weights only load failed</code>.
-              </p>
             </details>
             <div className="row">
               <a
