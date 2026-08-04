@@ -321,12 +321,22 @@ describe("custom model routes", () => {
   // what the boat listens for — only wakeWords does. The UI showed loaded
   // models as "in use", which read as "this is your wake word".
   it("reports whether a model is selected, separately from being loaded", async () => {
+    // A started plugin needs something answering Wyoming describe: each upload
+    // restarts the service to load the new model, and without a listener that
+    // restart waits out the full describe gate before giving up.
+    server = new MockWyomingServer({ role: "wake" });
+    const port = await server.listen();
     manager = installFakeManager({ dataMount });
     const app = createFakeApp();
     plugin = createPlugin(app, FAST_TIMING, async () => dataMount);
     const { router, routes } = makeRouter();
     plugin.registerWithRouter(router);
-    plugin.start({ wakeWords: ["chosen"], advanced: { customModels: true } });
+    plugin.start({
+      port,
+      wakeWords: ["chosen"],
+      advanced: { customModels: true },
+    });
+    await waitFor(() => emittedStatuses(app).at(-1) === "ready");
 
     for (const name of ["chosen.tflite", "ignored.tflite"]) {
       await findRoute(routes, "post", "/api/models").handler(
