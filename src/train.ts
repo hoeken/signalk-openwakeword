@@ -25,13 +25,29 @@ export interface PhraseAdvice {
 export type TrainingPlan = TrainingPlanResponse;
 
 /**
- * The community-maintained 2026 trainer. Chosen over dscripka's own notebook
- * because the upstream one still imports `onnx_tf`, which is unmaintained and
- * broken on current Colab runtimes (openWakeWord issues #251/#253/#299/#331).
- * It exports ONNX, which this plugin converts on the server.
+ * Our fork of the community 2026 trainer (notebooks/train_wakeword.ipynb).
+ *
+ * dscripka's own notebook is unusable — it still imports the dead `onnx_tf`
+ * (openWakeWord #251/#253/#299/#331). alfiedennen's fork fixed that, but has
+ * since bit-rotted against current Colab in two more places, both of which
+ * leave you with 0 negative clips ~40 minutes into a run:
+ *
+ *   - `deep-phonemizer` is never installed, so openwakeword's adversarial
+ *     negative generator dies on `No module named 'dp'`;
+ *   - torch >= 2.6 defaults `torch.load` to weights_only=True and refuses
+ *     dp's checkpoint, which pickles a Preprocessor.
+ *
+ * We carry both fixes as Patches G and H, plus a pre-flight that fails on a
+ * CPU runtime instead of silently training for hours. Offered upstream at
+ * alfiedennen/openwakeword-colab-2026#1; if that lands we can point back.
+ *
+ * Overridable via `advanced.notebookUrl` so a future breakage is a settings
+ * change rather than a plugin release.
  */
+export const NOTEBOOK_REPO = "hoeken/signalk-openwakeword";
 export const NOTEBOOK_URL =
-  "https://colab.research.google.com/github/alfiedennen/openwakeword-colab-2026/blob/main/train_wakeword.ipynb";
+  `https://colab.research.google.com/github/${NOTEBOOK_REPO}` +
+  "/blob/main/notebooks/train_wakeword.ipynb";
 
 /** Words common enough in ordinary speech that they cause false wakes. */
 const COMMON_WORDS = new Set([
@@ -142,7 +158,10 @@ export function advisePhrase(phrase: string): PhraseAdvice[] {
   return advice;
 }
 
-export function buildTrainingPlan(phrase: string): TrainingPlan {
+export function buildTrainingPlan(
+  phrase: string,
+  notebookUrl: string = NOTEBOOK_URL,
+): TrainingPlan {
   const trimmed = phrase.trim();
   const slug = slugify(trimmed);
   return {
@@ -152,7 +171,7 @@ export function buildTrainingPlan(phrase: string): TrainingPlan {
     // regex forbids underscores, so a suffix on a multi-word slug would NOT be
     // removed and the user would have to type the version too.)
     modelId: slug,
-    notebookUrl: NOTEBOOK_URL,
+    notebookUrl,
     advice: advisePhrase(trimmed),
     // The notebook does NOT take a YAML config — it has two Python variables
     // in one cell (marked "★ EDIT THESE TWO LINES ★") that you overwrite.
