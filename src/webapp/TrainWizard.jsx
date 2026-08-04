@@ -111,8 +111,8 @@ export default function TrainWizard({ onClose }) {
               everyday phrase will wake the boat during normal conversation.
             </p>
             <p className="hint">
-              Nothing to record and no scripts to write: you'll edit two lines
-              in a notebook, press Run, and come back with the finished file.
+              Nothing to record and nothing to configure: you'll open a
+              notebook, press Run, and come back with the finished file.
             </p>
             {error && <p className="notice error">{error}</p>}
             <div className="modal-actions">
@@ -149,55 +149,55 @@ export default function TrainWizard({ onClose }) {
               audio by having a speech engine say your phrase thousands of times
               in different voices.
             </p>
-            <label htmlFor="config">
-              In the notebook, find the cell marked{" "}
-              <strong>★ EDIT THESE TWO LINES ★</strong> and replace its two
-              lines with these:
-            </label>
-            <pre
-              id="config"
-              className="config selectable"
-              ref={configRef}
-              onClick={selectConfig}
-              title="Click to select"
-            >
-              {plan.config}
-            </pre>
-            {copyFailed && (
-              <p className="notice warn">
-                This browser won't let a page copy for you over plain HTTP (it
-                needs HTTPS). The lines are selected — press <kbd>Ctrl</kbd>+
-                <kbd>C</kbd> to copy them.
-              </p>
-            )}
-            <p className="hint">
-              That is the only edit you make — leave every other cell alone.
-              First set <strong>Runtime → Change runtime type</strong> to a{" "}
-              <strong>GPU</strong> (on a CPU runtime training takes many hours
-              and usually gets disconnected), then choose{" "}
-              <strong>Runtime → Run all</strong> and leave it to work.
+            <p>
+              The notebook opens already set to <strong>“{plan.phrase}”</strong>{" "}
+              and asks Colab for a GPU, so there is nothing to fill in. Choose{" "}
+              <strong>Runtime → Run all</strong> and leave the tab open — Colab
+              wipes everything if the session drops.
             </p>
             <details className="troubleshoot">
-              <summary>If it stops with an error part-way through</summary>
+              <summary>If something goes wrong</summary>
               <p className="hint">
-                This link points at a notebook maintained alongside this plugin,
-                with fixes for the two failures the widely-shared one still has.
-                If you are using a different copy and it dies during clip
-                generation with <code>No module named 'dp'</code> or{" "}
-                <code>Weights only load failed</code>, that is why — use ours.
+                The first cell should print <code>GPU present.</code> If it
+                stops there instead, your Google account has no GPU capacity
+                right now — wait a few hours, or use a ready-made wake word.
               </p>
               <p className="hint">
-                Colab also clears everything if the session disconnects, which
-                it does when a tab is left idle. If you come back to{" "}
+                If you come back to{" "}
                 <code>No such file or directory: my_model.yaml</code>, the
-                session was recycled and it has to start over — so keep the tab
-                open while it runs.
+                session was recycled and it has to start over.
               </p>
-            </details>
-            <div className="row">
+              <p className="hint">
+                Using a different copy of the notebook? Set the wake word by
+                hand in the cell marked{" "}
+                <strong>★ EDIT THESE TWO LINES ★</strong>:
+              </p>
+              <pre
+                id="config"
+                className="config selectable"
+                ref={configRef}
+                onClick={selectConfig}
+                title="Click to select"
+              >
+                {plan.config}
+              </pre>
+              {copyFailed && (
+                <p className="notice warn">
+                  This browser won't let a page copy for you over plain HTTP (it
+                  needs HTTPS). The lines are selected — press <kbd>Ctrl</kbd>+
+                  <kbd>C</kbd> to copy them.
+                </p>
+              )}
               <button onClick={copyConfig}>
                 {copied ? "Copied" : "Copy these lines"}
               </button>
+              <p className="hint">
+                Other copies also still have two bugs ours fixes:{" "}
+                <code>No module named 'dp'</code> and{" "}
+                <code>Weights only load failed</code>.
+              </p>
+            </details>
+            <div className="row">
               <a
                 className="button primary"
                 href={plan.notebookUrl}

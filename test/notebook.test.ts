@@ -102,6 +102,17 @@ describe("forked training notebook", () => {
     expect(codeText()).toContain("nvidia-smi");
   });
 
+  // Colab reads this when opening the notebook and pre-selects the runtime,
+  // so the user does not have to find the Runtime menu. It is a request, not
+  // a guarantee (quota still wins) — hence the nvidia-smi check above.
+  it("requests a GPU runtime through its metadata", async () => {
+    const raw = await fs.readFile(NOTEBOOK, "utf8");
+    const meta = (JSON.parse(raw) as { metadata: Record<string, unknown> })
+      .metadata;
+    expect(meta.accelerator).toBe("GPU");
+    expect((meta.colab as { gpuType?: string })?.gpuType).toBe("T4");
+  });
+
   it("credits upstream and points at the issue we filed", () => {
     expect(text).toContain("alfiedennen/openwakeword-colab-2026");
   });

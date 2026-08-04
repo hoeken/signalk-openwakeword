@@ -198,11 +198,11 @@ export function buildTrainingPlan(
       `MODEL_NAME    = '${slug}'`,
     ].join("\n"),
     steps: [
-      `Open the notebook. It arrives already set to “${trimmed}” — there is ` +
-        "nothing to type in.",
-      "Set Runtime → Change runtime type to a GPU. The notebook stops " +
-        "immediately if you skip this, because training on a CPU runs for " +
-        "hours and then gets disconnected.",
+      `Open the notebook. It arrives already set to “${trimmed}”, and asks ` +
+        "Colab for a GPU — there is nothing to fill in or choose.",
+      "Check the first cell prints “GPU present.” If it stops instead, your " +
+        "Google account has no GPU capacity right now; wait a few hours, or " +
+        "use a ready-made wake word instead.",
       "Choose Runtime → Run all and leave the tab open. It takes an hour or " +
         "two, and Colab wipes everything if the session drops. This cannot " +
         "run on the Signal K server, which has no graphics card.",
