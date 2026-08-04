@@ -317,6 +317,31 @@ describe("custom model routes", () => {
     expect(res.body).toMatchObject({ models: [], customModelsEnabled: false });
   });
 
+  // The service loads EVERY model it finds, so "loaded" says nothing about
+  // what the boat listens for — only wakeWords does. The UI showed loaded
+  // models as "in use", which read as "this is your wake word".
+  it("reports whether a model is selected, separately from being loaded", async () => {
+    manager = installFakeManager({ dataMount });
+    const app = createFakeApp();
+    plugin = createPlugin(app, FAST_TIMING, async () => dataMount);
+    const { router, routes } = makeRouter();
+    plugin.registerWithRouter(router);
+    plugin.start({ wakeWords: ["chosen"], advanced: { customModels: true } });
+
+    for (const name of ["chosen.tflite", "ignored.tflite"]) {
+      await findRoute(routes, "post", "/api/models").handler(
+        { query: { filename: name }, body: Buffer.from("TFL3xx") },
+        makeRes(),
+      );
+    }
+    const res = makeRes();
+    await findRoute(routes, "get", "/api/models").handler({}, res);
+    const listed = (res.body as { models: { id: string; selected: boolean }[] })
+      .models;
+    expect(listed.find((m) => m.id === "chosen")?.selected).toBe(true);
+    expect(listed.find((m) => m.id === "ignored")?.selected).toBe(false);
+  });
+
   it("uploads a .tflite and reports the id wyoming will advertise", async () => {
     const { routes } = setup();
     const res = makeRes();

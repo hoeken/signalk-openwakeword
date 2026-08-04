@@ -80,7 +80,12 @@ function serve() {
       }
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
-        JSON.stringify({ customModelsEnabled: true, wakeWords: [], models }),
+        JSON.stringify({
+          customModelsEnabled: true,
+          // Keep consistent with the fixtures' `selected` flags below.
+          wakeWords: ["hey_seabird"],
+          models,
+        }),
       );
       return;
     }
@@ -190,7 +195,9 @@ try {
     page.getByRole("heading", { name: "Custom wake words" }),
   ).toBeVisible();
   await expect(page.getByText("hey_seabird", { exact: true })).toBeVisible();
-  await expect(page.getByText("in use")).toBeVisible();
+  await expect(
+    page.locator("td .status", { hasText: "listening" }),
+  ).toBeVisible();
   if (!requests.some((r) => r.endsWith("/api/models"))) {
     throw new Error("expected the page to fetch /api/models");
   }

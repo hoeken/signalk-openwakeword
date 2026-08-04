@@ -14,19 +14,27 @@ function formatSize(bytes) {
 }
 
 function ModelRow({ model, onConvert, onDelete, busy, customModelsEnabled }) {
-  // "Installed" and "in use" are different things, and the gap between them is
-  // where every silent failure lives: customModels off, a pending restart, or
-  // an .onnx that was never converted.
+  // Three different states get confused here, so be precise:
+  //   loaded    — the service has the model in memory. It loads EVERY model it
+  //               can find; this says nothing about what the boat listens for.
+  //   selected  — the model's id is in the plugin's wakeWords, which is what
+  //               actually decides the boat's wake word.
+  //   neither   — installed but not picked up, usually a pending restart or
+  //               customModels being off. This is where silent failures live.
   const status =
     model.format === "onnx"
       ? model.converted
         ? { label: "source file", kind: "muted" }
         : { label: "needs converting", kind: "warn" }
-      : model.live
-        ? { label: "in use", kind: "ok" }
-        : customModelsEnabled
-          ? { label: "installed — restart to load", kind: "warn" }
-          : { label: "installed — not enabled", kind: "warn" };
+      : model.selected && model.live
+        ? { label: "listening", kind: "ok" }
+        : model.selected
+          ? { label: "selected — restart to load", kind: "warn" }
+          : model.live
+            ? { label: "ready, not selected", kind: "muted" }
+            : customModelsEnabled
+              ? { label: "installed — restart to load", kind: "warn" }
+              : { label: "installed — not enabled", kind: "warn" };
 
   return (
     <tr>
@@ -189,8 +197,11 @@ export default function App() {
         )}
         {tflite.length > 0 && (
           <p className="hint">
-            To use one, add its wake word to the openWakeWord plugin settings
-            and restart the plugin.
+            The service keeps every model loaded, so “ready” only means it is
+            available. The boat listens for the ones named in the openWakeWord
+            plugin's <strong>wake words</strong> setting — those show as{" "}
+            <strong>listening</strong> here. Add or remove them there, then
+            restart the plugin.
           </p>
         )}
       </section>
