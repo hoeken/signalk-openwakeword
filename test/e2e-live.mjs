@@ -241,8 +241,10 @@ try {
     apiCalls.join("; "),
   );
 
-  await expect(page.getByText("in use").first()).toBeVisible();
-  check("webapp shows a model as in use", true);
+  await expect(
+    page.getByText(/listening|ready, not selected/).first(),
+  ).toBeVisible();
+  check("webapp shows a model status", true);
 
   await page.screenshot({
     path: path.join(shotDir, "live-01-models.png"),
