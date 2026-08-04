@@ -85,6 +85,23 @@ describe("forked training notebook", () => {
     expect(code).toMatch(/raise RuntimeError\('CPU runtime/);
   });
 
+  // Upstream shipped double-encoded UTF-8, so its box-drawing rules rendered
+  // as "â”€â”€â”€" in the browser. Repaired in the fork; guard the repair.
+  it("has no double-encoded UTF-8", () => {
+    expect(text).not.toMatch(/â|Ã/);
+  });
+
+  it("reads the wake word from the URL so the webapp can pre-fill it", () => {
+    const code = codeText();
+    expect(code).toContain("_from_url");
+    expect(code).toContain("phrase");
+    expect(code).toContain("model_name");
+  });
+
+  it("stops immediately on a CPU runtime, before the long downloads", () => {
+    expect(codeText()).toContain("nvidia-smi");
+  });
+
   it("credits upstream and points at the issue we filed", () => {
     expect(text).toContain("alfiedennen/openwakeword-colab-2026");
   });

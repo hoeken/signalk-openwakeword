@@ -45,9 +45,17 @@ export type TrainingPlan = TrainingPlanResponse;
  * change rather than a plugin release.
  */
 export const NOTEBOOK_REPO = "hoeken/signalk-openwakeword";
+export const NOTEBOOK_REF = "main";
+/**
+ * Until this branch is merged upstream, `hoeken/…@main` has no notebooks/
+ * directory and the link would 404. Point at the branch on the fork it is
+ * actually pushed to; switch both constants back once merged.
+ */
+export const NOTEBOOK_SOURCE_REPO = "dirkwa/signalk-openwakeword";
+export const NOTEBOOK_SOURCE_REF = "feat/custom-wakeword-webapp";
 export const NOTEBOOK_URL =
-  `https://colab.research.google.com/github/${NOTEBOOK_REPO}` +
-  "/blob/main/notebooks/train_wakeword.ipynb";
+  `https://colab.research.google.com/github/${NOTEBOOK_SOURCE_REPO}` +
+  `/blob/${NOTEBOOK_SOURCE_REF}/notebooks/train_wakeword.ipynb`;
 
 /** Words common enough in ordinary speech that they cause false wakes. */
 const COMMON_WORDS = new Set([
@@ -171,7 +179,14 @@ export function buildTrainingPlan(
     // regex forbids underscores, so a suffix on a multi-word slug would NOT be
     // removed and the user would have to type the version too.)
     modelId: slug,
-    notebookUrl,
+    // Carry the wake word in the link. Our notebook reads these back from
+    // document.location, so the phrase cell arrives pre-filled and there is
+    // nothing to paste. A notebook that ignores them (an override, or an
+    // older copy) still opens fine and falls back to its own defaults —
+    // which is why the config block and steps below are still provided.
+    notebookUrl:
+      `${notebookUrl}?phrase=${encodeURIComponent(trimmed)}` +
+      `&model_name=${encodeURIComponent(slug)}`,
     advice: advisePhrase(trimmed),
     // The notebook does NOT take a YAML config — it has two Python variables
     // in one cell (marked "★ EDIT THESE TWO LINES ★") that you overwrite.
@@ -183,14 +198,15 @@ export function buildTrainingPlan(
       `MODEL_NAME    = '${slug}'`,
     ].join("\n"),
     steps: [
-      "Open the notebook, then scroll down to the cell marked " +
-        "“★ EDIT THESE TWO LINES ★”.",
-      `Replace its two lines with the two above, so it trains on ` +
-        `“${trimmed}”. Leave every other cell alone.`,
-      "Choose Runtime → Run all, and leave it. It needs Google's GPU and " +
-        "takes about an hour — it cannot run on the Signal K server, which " +
-        "has no graphics card.",
-      `When it finishes, download the ${slug}.onnx file it produced.`,
+      `Open the notebook. It arrives already set to “${trimmed}” — there is ` +
+        "nothing to type in.",
+      "Set Runtime → Change runtime type to a GPU. The notebook stops " +
+        "immediately if you skip this, because training on a CPU runs for " +
+        "hours and then gets disconnected.",
+      "Choose Runtime → Run all and leave the tab open. It takes an hour or " +
+        "two, and Colab wipes everything if the session drops. This cannot " +
+        "run on the Signal K server, which has no graphics card.",
+      `When it finishes it downloads ${slug}.onnx.`,
       "Come back here and drop that file on this page. It is converted to " +
         "the format the wake word service needs, checked against the " +
         "original, and installed for you.",
