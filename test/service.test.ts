@@ -48,6 +48,25 @@ function setup(
 }
 
 describe("ServiceRunner lifecycle", () => {
+  // Omitted rather than empty: on the consumer side an empty list is
+  // indistinguishable from "deliberately no wake detection".
+  it("omits wakeWords from the announcement when none are configured", async () => {
+    server = new MockWyomingServer({ role: "wake" });
+    const port = await server.listen();
+    manager = installFakeManager();
+    const app = createFakeApp();
+    const settings = { ...withDefaults({ port }), wakeWords: [] };
+    await setup(app, settings).start();
+
+    const emitted = app.emissions
+      .filter((e) => e.name === "wyoming-service")
+      .map((e) => e.value as Record<string, unknown>);
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const value of emitted) {
+      expect(value).not.toHaveProperty("wakeWords");
+    }
+  });
+
   it("start() reaches ready and emits the exact §3.1 object shape", async () => {
     server = new MockWyomingServer({ role: "wake" });
     const port = await server.listen();
@@ -61,8 +80,23 @@ describe("ServiceRunner lifecycle", () => {
         .filter((e) => e.name === "wyoming-service")
         .map((e) => e.value),
     ).toEqual([
-      { plugin: "signalk-openwakeword", type: "wake", uri, status: "starting" },
-      { plugin: "signalk-openwakeword", type: "wake", uri, status: "ready" },
+      // wakeWords is an additive §3.1 extension: it lets signalk-wyoming wire
+      // satellites from this plugin's setting instead of the operator
+      // configuring the same words twice, in two plugins.
+      {
+        plugin: "signalk-openwakeword",
+        type: "wake",
+        uri,
+        status: "starting",
+        wakeWords: ["okay_nabu"],
+      },
+      {
+        plugin: "signalk-openwakeword",
+        type: "wake",
+        uri,
+        status: "ready",
+        wakeWords: ["okay_nabu"],
+      },
     ]);
 
     const ensure = manager.callsTo("ensureRunning");
