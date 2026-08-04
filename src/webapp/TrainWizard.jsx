@@ -172,9 +172,22 @@ export default function TrainWizard({ onClose }) {
             )}
             <p className="hint">
               That is the only edit you make — leave every other cell alone.
-              Then choose <strong>Runtime → Run all</strong> and leave it to
-              work.
+              First set <strong>Runtime → Change runtime type</strong> to a{" "}
+              <strong>GPU</strong> (on a CPU runtime training takes many hours
+              and usually gets disconnected), then choose{" "}
+              <strong>Runtime → Run all</strong> and leave it to work.
             </p>
+            <details className="troubleshoot">
+              <summary>If it stops with an error part-way through</summary>
+              <p className="hint">
+                A known gap in that notebook: clip generation fails with{" "}
+                <code>No module named 'dp'</code>, leaving 0 negative clips. Add
+                a new cell above it containing{" "}
+                <code>!pip install -q deep-phonemizer</code>, run that, then
+                re-run the cell that failed. Work already done is cached, so it
+                picks up where it stopped.
+              </p>
+            </details>
             <div className="row">
               <button onClick={copyConfig}>
                 {copied ? "Copied" : "Copy these lines"}

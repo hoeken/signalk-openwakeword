@@ -364,6 +364,21 @@ button.danger:hover:not(:disabled) {
   border-color: var(--accent);
 }
 
+.troubleshoot {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  margin-bottom: 0.8rem;
+}
+.troubleshoot summary {
+  cursor: pointer;
+  font-size: 0.87rem;
+  color: var(--muted);
+}
+.troubleshoot p {
+  margin: 0.5rem 0 0;
+}
+
 kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85em;
