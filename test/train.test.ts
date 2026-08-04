@@ -52,10 +52,16 @@ describe("buildTrainingPlan", () => {
     );
   });
 
-  it("tells the user which cell to edit", () => {
-    expect(buildTrainingPlan("hey seabird").steps.join(" ")).toMatch(
-      /EDIT THESE TWO LINES/,
-    );
+  // The link now pre-fills the phrase, so the steps say so rather than
+  // sending people hunting for a cell to edit.
+  it("says the notebook arrives pre-filled", () => {
+    const steps = buildTrainingPlan("hey seabird").steps.join(" ");
+    expect(steps).toMatch(/already set to/i);
+    expect(steps).toMatch(/nothing to type in/i);
+  });
+
+  it("still tells the user to pick a GPU runtime", () => {
+    expect(buildTrainingPlan("hey seabird").steps.join(" ")).toMatch(/GPU/);
   });
 
   // No _vN suffix: wyoming's stripping regex forbids underscores, so a
@@ -71,13 +77,20 @@ describe("buildTrainingPlan", () => {
   // failures that each cost ~40 minutes before surfacing.
   it("links our maintained fork by default", () => {
     expect(buildTrainingPlan("hey seabird").notebookUrl).toContain(
-      "signalk-openwakeword/blob/main/notebooks/train_wakeword.ipynb",
+      "signalk-openwakeword/blob/feat/custom-wakeword-webapp/notebooks/train_wakeword.ipynb",
     );
   });
 
   it("honours an overridden notebook URL", () => {
     const plan = buildTrainingPlan("hey seabird", "https://example.test/nb");
-    expect(plan.notebookUrl).toBe("https://example.test/nb");
+    expect(plan.notebookUrl).toMatch(/^https:\/\/example\.test\/nb\?/);
+  });
+
+  // Our notebook reads these back, so the phrase cell needs no editing.
+  it("carries the wake word in the notebook link", () => {
+    const url = buildTrainingPlan("hey moin").notebookUrl;
+    expect(url).toContain("phrase=hey%20moin");
+    expect(url).toContain("model_name=hey_moin");
   });
 
   it("links a notebook and says the result is an .onnx file", () => {
