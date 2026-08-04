@@ -180,13 +180,22 @@ export default function TrainWizard({ onClose }) {
             <details className="troubleshoot">
               <summary>If it stops with an error part-way through</summary>
               <p className="hint">
-                A known gap in that notebook: clip generation fails with{" "}
-                <code>No module named 'dp'</code>, leaving 0 negative clips. Add
-                a new cell above it containing{" "}
-                <code>!pip install -q deep-phonemizer</code>, run that, then
-                re-run the cell that failed. Work already done is cached, so it
-                picks up where it stopped.
+                Two known gaps in that notebook, both in the clip-generation
+                step and both leaving 0 negative clips. Add a cell above it with
+                the fixes, run that, then re-run the cell that failed — work
+                already done is cached, so it resumes where it stopped.
               </p>
+              <p className="hint">
+                For <code>No module named 'dp'</code>:
+              </p>
+              <pre className="config">!pip install -q deep-phonemizer</pre>
+              <p className="hint">
+                Then, for <code>UnpicklingError: Weights only load failed</code>{" "}
+                (newer PyTorch refusing an older checkpoint):
+              </p>
+              <pre className="config">
+                {`!sed -i 's|checkpoint = torch.load(checkpoint_path, map_location=device)|checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)|' /usr/local/lib/python3.12/dist-packages/dp/model/model.py`}
+              </pre>
             </details>
             <div className="row">
               <button onClick={copyConfig}>
