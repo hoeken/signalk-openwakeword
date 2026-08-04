@@ -83,8 +83,11 @@ describe("assertSafeFilename", () => {
 describe("makeDataMountResolver", () => {
   // Composed rather than written out: the Signal K plugin-CI check rejects any
   // source file containing a quoted /home/<user>/ literal.
+  // Composed rather than written out: the Signal K plugin-CI check rejects any
+  // source file containing a quoted /home/<user>/ literal. Joined rather than
+  // spelled with slashes so the separators match the resolver's own on Windows.
   const HOME = "/home";
-  const PLUGIN_DATA = `${HOME}/node/.signalk/plugin-config-data`;
+  const PLUGIN_DATA = path.join(HOME, "node", ".signalk", "plugin-config-data");
 
   // Regression: this used to call manager.resolveSignalkDataMount(), which
   // returns the HOST path. When Signal K itself runs in a container the host
@@ -92,9 +95,11 @@ describe("makeDataMountResolver", () => {
   // EACCES: permission denied, mkdir /home/<hostuser>.
   it("derives signalk-container's data dir from our own, staying local", async () => {
     const resolve = makeDataMountResolver({
-      getDataDirPath: () => `${PLUGIN_DATA}/signalk-openwakeword`,
+      getDataDirPath: () => path.join(PLUGIN_DATA, "signalk-openwakeword"),
     });
-    await expect(resolve()).resolves.toBe(`${PLUGIN_DATA}/signalk-container`);
+    await expect(resolve()).resolves.toBe(
+      path.join(PLUGIN_DATA, "signalk-container"),
+    );
   });
 
   it("returns null when the server does not expose a data dir", async () => {
