@@ -57,11 +57,15 @@ describe("buildTrainingPlan", () => {
   it("says the notebook arrives pre-filled", () => {
     const steps = buildTrainingPlan("hey seabird").steps.join(" ");
     expect(steps).toMatch(/already set to/i);
-    expect(steps).toMatch(/nothing to type in/i);
+    expect(steps).toMatch(/nothing to fill in/i);
   });
 
-  it("still tells the user to pick a GPU runtime", () => {
-    expect(buildTrainingPlan("hey seabird").steps.join(" ")).toMatch(/GPU/);
+  // The notebook requests a GPU itself, so the steps confirm it rather than
+  // sending the user to the Runtime menu.
+  it("tells the user how to confirm a GPU was allocated", () => {
+    const steps = buildTrainingPlan("hey seabird").steps.join(" ");
+    expect(steps).toMatch(/GPU/);
+    expect(steps).toMatch(/GPU present/);
   });
 
   // No _vN suffix: wyoming's stripping regex forbids underscores, so a
