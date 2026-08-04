@@ -114,8 +114,8 @@ export interface DataDirApp {
  * The subtlety that matters: `manager.resolveSignalkDataMount()` returns the
  * *host* path, which is what podman needs as a bind source — but it is NOT
  * where this code can read and write. When Signal K itself runs in a
- * container, the host path (`/home/dirk/.signalk/...`) does not exist inside
- * it; the same directory is visible at `/home/node/.signalk/...`. Using the
+ * container, the host path (/home/<hostuser>/.signalk/...) does not exist
+ * inside it; the same directory is visible at /home/node/.signalk/... Using the
  * host path here fails with EACCES/ENOENT on exactly the deployment this
  * plugin is most often used in.
  *

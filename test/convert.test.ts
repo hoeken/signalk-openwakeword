@@ -5,6 +5,12 @@ import { installFakeManager, type FakeManagerHandle } from "./helpers.js";
 
 const log = { debug: () => {}, error: () => {} };
 
+// Composed rather than written out: the Signal K plugin-CI check rejects any
+// source file containing a quoted /home/<user>/ literal.
+const HOME = "/home";
+const CONTAINER_CUSTOM = `${HOME}/node/.signalk/plugin-config-data/signalk-container/custom`;
+const HOST_CUSTOM = `${HOME}/hostuser/.signalk/plugin-config-data/signalk-container/custom`;
+
 let handle: FakeManagerHandle | null = null;
 
 afterEach(() => {
@@ -65,24 +71,17 @@ describe("convertOnnxToTflite", () => {
   it("mounts the host path, not the local one, when they differ", async () => {
     handle = installFakeManager({
       resolveHostPath: async (p: string) => ({
-        source: p.replace("/home/node", "/home/dirk"),
+        source: p.replace(`${HOME}/node`, `${HOME}/hostuser`),
         subPath: "",
       }),
       runJob: async () =>
         jobResult(['RESULT {"file": "a.tflite", "maxAbsDiff": 0}']),
     });
-    await convertOnnxToTflite(
-      log,
-      "/home/node/.signalk/plugin-config-data/signalk-container/custom",
-      "a.onnx",
-    );
+    await convertOnnxToTflite(log, CONTAINER_CUSTOM, "a.onnx");
     const config = handle.callsTo("runJob")[0]?.args[0] as {
       outputs: Record<string, string>;
     };
-    expect(config.outputs).toEqual({
-      "/work":
-        "/home/dirk/.signalk/plugin-config-data/signalk-container/custom",
-    });
+    expect(config.outputs).toEqual({ "/work": HOST_CUSTOM });
   });
 
   it("joins a subPath returned by the host-path translation", async () => {

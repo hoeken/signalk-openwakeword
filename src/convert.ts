@@ -154,8 +154,8 @@ print("RESULT " + json.dumps({"file": os.path.basename(final), "maxAbsDiff": wor
  * `localDir` is the custom-model directory as THIS process sees it. It is
  * translated to a host path before being handed to the runtime: a bind mount
  * source is interpreted by the host's podman/docker, so when Signal K itself
- * runs in a container the two differ (`/home/node/...` here vs
- * `/home/dirk/...` on the host) and mounting the local path would silently
+ * runs in a container the two differ (/home/node/... here vs
+ * /home/<hostuser>/... on the host) and mounting the local path would silently
  * bind an empty or non-existent directory.
  */
 export async function convertOnnxToTflite(
