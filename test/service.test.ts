@@ -331,6 +331,36 @@ describe("ServiceRunner lifecycle", () => {
     expect(report.info).toBeTruthy();
   });
 
+  it("statusReport carries the configured wake words", async () => {
+    server = new MockWyomingServer({ role: "wake" });
+    const port = await server.listen();
+    manager = installFakeManager();
+    const app = createFakeApp();
+    const active = setup(app, withDefaults({ port, wakeWords: ["hey_moin"] }));
+    await active.start();
+    const report = await active.statusReport();
+    // A satellite that discovers this plugin over REST needs to know what it
+    // listens for; without this it has to be told separately, and a mismatch
+    // is silent -- it simply never wakes.
+    expect(report.wakeWords).toEqual(["hey_moin"]);
+  });
+
+  it("statusReport omits wakeWords when none are configured", async () => {
+    server = new MockWyomingServer({ role: "wake" });
+    const port = await server.listen();
+    manager = installFakeManager();
+    const app = createFakeApp();
+    // Bypassing normaliseSettings on purpose: it maps an empty array back to
+    // the default, so the empty case cannot be reached through config. The
+    // guard still matters because settings can be constructed directly, and
+    // an empty list would otherwise read as "listens for nothing".
+    const settings = { ...withDefaults({ port }), wakeWords: [] };
+    const active = setup(app, settings);
+    await active.start();
+    const report = await active.statusReport();
+    expect(report.wakeWords).toBeUndefined();
+  });
+
   it("healthProbe reflects service reachability", async () => {
     server = new MockWyomingServer({ role: "wake" });
     const port = await server.listen();

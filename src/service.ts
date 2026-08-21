@@ -381,6 +381,16 @@ export class ServiceRunner {
       containerState: await this.container.getState(),
       lastHealth: this.lastHealth,
       info: this.lastInfo,
+      // Same reason the wyoming-service announcement carries these: a client
+      // that cannot see what this service listens for has to be told the wake
+      // word separately, and when the two disagree nothing errors -- the
+      // satellite just never wakes. The announcement only reaches consumers of
+      // PropertyValues; satellites that discover this plugin over its REST API
+      // need it here too. Omitted when nothing is configured, matching the
+      // announcement: an empty list reads as "deliberately none".
+      ...(this.settings.wakeWords.length > 0
+        ? { wakeWords: [...this.settings.wakeWords] }
+        : {}),
     };
   }
 
