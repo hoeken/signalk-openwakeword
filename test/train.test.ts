@@ -52,12 +52,14 @@ describe("buildTrainingPlan", () => {
     );
   });
 
-  // The link now pre-fills the phrase, so the steps say so rather than
-  // sending people hunting for a cell to edit.
-  it("says the notebook arrives pre-filled", () => {
+  // The notebook's first cell asks for the wake word, so the steps have to say
+  // that the run pauses for it — a user who walks away misses the prompt and
+  // comes back to a model trained on the example phrase.
+  it("says the first cell stops and asks for the phrase", () => {
     const steps = buildTrainingPlan("hey seabird").steps.join(" ");
-    expect(steps).toMatch(/already set to/i);
-    expect(steps).toMatch(/nothing to fill in/i);
+    expect(steps).toMatch(/first cell/i);
+    expect(steps).toMatch(/asks for the wake word/i);
+    expect(steps).toMatch(/hey seabird/);
   });
 
   // The notebook requests a GPU itself, so the steps confirm it rather than
@@ -87,14 +89,17 @@ describe("buildTrainingPlan", () => {
 
   it("honours an overridden notebook URL", () => {
     const plan = buildTrainingPlan("hey seabird", "https://example.test/nb");
-    expect(plan.notebookUrl).toMatch(/^https:\/\/example\.test\/nb\?/);
+    expect(plan.notebookUrl).toBe("https://example.test/nb");
   });
 
-  // Our notebook reads these back, so the phrase cell needs no editing.
-  it("carries the wake word in the notebook link", () => {
+  // Colab gives Python no access to the notebook tab's URL — output.eval_js
+  // runs in the sandboxed output frame — so a `?phrase=` suffix would be dead
+  // weight that only made the link look like it configured something.
+  it("leaves the notebook link bare rather than passing the phrase in it", () => {
     const url = buildTrainingPlan("hey moin").notebookUrl;
-    expect(url).toContain("phrase=hey%20moin");
-    expect(url).toContain("model_name=hey_moin");
+    expect(url).not.toContain("?");
+    expect(url).not.toContain("phrase");
+    expect(url).not.toContain("model_name");
   });
 
   it("links a notebook and says the result is an .onnx file", () => {

@@ -179,33 +179,35 @@ export function buildTrainingPlan(
     // regex forbids underscores, so a suffix on a multi-word slug would NOT be
     // removed and the user would have to type the version too.)
     modelId: slug,
-    // Carry the wake word in the link. Our notebook reads these back from
-    // document.location, so the phrase cell arrives pre-filled and there is
-    // nothing to paste. A notebook that ignores them (an override, or an
-    // older copy) still opens fine and falls back to its own defaults —
-    // which is why the config block and steps below are still provided.
-    notebookUrl:
-      `${notebookUrl}?phrase=${encodeURIComponent(trimmed)}` +
-      `&model_name=${encodeURIComponent(slug)}`,
+    // A bare link, deliberately: the phrase CANNOT be passed in the URL.
+    // Colab runs `output.eval_js` inside the sandboxed output iframe, whose
+    // document.location is that frame's own URL (…googleusercontent.com/
+    // outputframe.html?vrz=…) — the notebook tab's query string and fragment
+    // are cross-origin and unreadable from Python, and no Colab API exposes
+    // them. So the notebook asks for the phrase in its first code cell and
+    // the user pastes it there; see the steps below.
+    notebookUrl,
     advice: advisePhrase(trimmed),
-    // The notebook does NOT take a YAML config — it has two Python variables
-    // in one cell (marked "★ EDIT THESE TWO LINES ★") that you overwrite.
-    // Emit exactly those two lines so they can be pasted straight over the
-    // originals. TARGET_PHRASE is a list: extra entries are pronunciation
-    // variants that all train into the same wake word.
+    // Fallback only, for a copy of the notebook whose first cell never ran:
+    // it takes no YAML config, just two Python variables in the config cell
+    // that can be overwritten. TARGET_PHRASE is a list — extra entries are
+    // pronunciation variants that all train into the same wake word.
     config: [
       `TARGET_PHRASE = ['${trimmed.replace(/'/g, "\\'")}']`,
       `MODEL_NAME    = '${slug}'`,
     ].join("\n"),
     steps: [
-      `Open the notebook. It arrives already set to “${trimmed}”, and asks ` +
-        "Colab for a GPU — there is nothing to fill in or choose.",
-      "Check the first cell prints “GPU present.” If it stops instead, your " +
-        "Google account has no GPU capacity right now; wait a few hours, or " +
-        "use a ready-made wake word instead.",
-      "Choose Runtime → Run all and leave the tab open. It takes an hour or " +
-        "two, and Colab wipes everything if the session drops. This cannot " +
-        "run on the Signal K server, which has no graphics card.",
+      "Open the notebook and choose Runtime → Run all. It asks Colab for a " +
+        "GPU itself, so there is no runtime to choose.",
+      `The first cell stops and asks for the wake word: type “${trimmed}” ` +
+        "and press Enter. That is the only thing you fill in — everything " +
+        "after it runs unattended.",
+      "Check that it then prints “GPU present.” If it stops there instead, " +
+        "your Google account has no GPU capacity right now; wait a few " +
+        "hours, or use a ready-made wake word instead.",
+      "Leave the tab open. It takes an hour or two, and Colab wipes " +
+        "everything if the session drops. This cannot run on the Signal K " +
+        "server, which has no graphics card.",
       `When it finishes it downloads ${slug}.onnx.`,
       "Come back here and drop that file on this page. It is converted to " +
         "the format the wake word service needs, checked against the " +

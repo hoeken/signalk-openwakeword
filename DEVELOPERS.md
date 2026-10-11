@@ -209,6 +209,17 @@ Patch G is applied in **Python, not `sed`**, deliberately: the upstream patches
 use `sed`, which silently no-ops if whitespace drifts, and G then asserts its
 own result. That failure mode cost real time to diagnose.
 
+The fork also adds **section 0**, which asks for the wake word with `input()`
+and writes `/content/wakeword.json` for the config cell to read back. Do not
+replace that with a `?phrase=` parameter on the Colab link: `output.eval_js`
+runs inside the sandboxed output iframe, so `document.location` there is that
+frame's own URL (`…googleusercontent.com/outputframe.html?vrz=…`), not the
+notebook tab's. The tab's query string and fragment are cross-origin, the
+`SecurityError` is easy to swallow, and no Colab API exposes them — an earlier
+version of this plugin shipped that link and silently trained `mr_graves` for
+everyone. `document.referrer` is no way round it either (Chrome's default
+referrer policy strips it to the origin, and fragments are never sent).
+
 **This is the one component with no CI.** A Colab notebook can only be
 verified by running it — ~90 minutes of GPU time, by hand. `test/notebook.test.ts`
 therefore asserts that the _reasons we forked_ are still present, so a re-sync

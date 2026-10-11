@@ -117,9 +117,11 @@ most ship both formats, so grab the `.tflite` and skip the conversion.
 ### Creating a new one
 
 Use **Create a wake word** in the webapp. You give it a phrase; it tells you
-whether the phrase will work well, fills in the training config, and links
-you to the notebook. Training runs on a free Google Colab GPU and takes
-about an hour — it **cannot** run on the Signal K server, which has no
+whether the phrase will work well, puts the phrase on your clipboard, and
+links you to the notebook. In Colab choose **Runtime → Run all**: the first
+cell stops and asks for the wake word, and once you have pasted it in there
+is nothing else to fill in. Training runs on a free Google Colab GPU and
+takes about an hour — it **cannot** run on the Signal K server, which has no
 graphics card and would need roughly 17 GB of training data. When it
 finishes you upload the `.onnx` it produced and the webapp handles the rest.
 

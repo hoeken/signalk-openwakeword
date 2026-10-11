@@ -91,11 +91,28 @@ describe("forked training notebook", () => {
     expect(text).not.toMatch(/â|Ã/);
   });
 
-  it("reads the wake word from the URL so the webapp can pre-fill it", () => {
-    const code = codeText();
-    expect(code).toContain("_from_url");
-    expect(code).toContain("phrase");
-    expect(code).toContain("model_name");
+  // Colab cannot hand URL query params to Python: output.eval_js evaluates in
+  // the sandboxed output iframe, whose document.location is that frame's own
+  // URL, and the notebook tab's is cross-origin. So the wake word is asked for
+  // in the first code cell and passed on through a file.
+  it("asks for the wake word in its first code cell", () => {
+    const firstCode = cells
+      .filter((c) => c.cell_type === "code")
+      .map(bodyOf)[0];
+    expect(firstCode).toMatch(/\binput\(/);
+    expect(firstCode).toContain("wakeword.json");
+    expect(firstCode).toContain("TARGET_PHRASE");
+    expect(firstCode).toContain("MODEL_NAME");
+  });
+
+  it("passes that answer to the config cell", () => {
+    expect(codeText()).toContain("_from_section_0");
+    expect(codeText()).toContain("/content/wakeword.json");
+  });
+
+  it("no longer tries to read the wake word out of the browser URL", () => {
+    expect(codeText()).not.toMatch(/eval_js\(/);
+    expect(codeText()).not.toMatch(/document\.location\.(search|hash)/);
   });
 
   it("stops immediately on a CPU runtime, before the long downloads", () => {
@@ -117,10 +134,13 @@ describe("forked training notebook", () => {
     expect(text).toContain("alfiedennen/openwakeword-colab-2026");
   });
 
-  it("still has the phrase cell users must edit", () => {
-    expect(codeText()).toContain("TARGET_PHRASE");
-    expect(codeText()).toContain("MODEL_NAME");
-    expect(text).toContain("EDIT THESE TWO LINES");
+  // Still hand-editable, for a copy of the notebook whose first cell never ran
+  // — which is what the webapp's two fallback lines are pasted over.
+  it("keeps the two phrase lines editable in the config cell", () => {
+    const code = codeText();
+    expect(code).toMatch(/^TARGET_PHRASE = /m);
+    expect(code).toMatch(/^MODEL_NAME {4}= /m);
+    expect(text).toContain("NOTHING TO EDIT HERE");
   });
 
   it("still exports ONNX, which the plugin converts server-side", () => {

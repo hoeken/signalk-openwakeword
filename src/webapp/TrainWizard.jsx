@@ -12,14 +12,67 @@ import React, { useRef, useState } from "react";
 import { useStore } from "./store.js";
 import { copyText } from "./clipboard.js";
 
+/**
+ * Text to take over to Colab, with a copy button.
+ *
+ * Signal K is usually served over plain HTTP, where the browser refuses the
+ * clipboard API outright — so failing to copy is a normal outcome here, not an
+ * error case. When it happens we select the text instead, leaving one
+ * keystroke rather than a fiddly drag.
+ */
+function CopyBlock({ text, label }) {
+  const ref = useRef(null);
+  const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const select = () => {
+    const node = ref.current;
+    if (!node || typeof window.getSelection !== "function") return;
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+
+  const copy = async () => {
+    if (await copyText(text)) {
+      setCopied(true);
+      setFailed(false);
+      setTimeout(() => setCopied(false), 2000);
+      return;
+    }
+    setFailed(true);
+    select();
+  };
+
+  return (
+    <>
+      <pre
+        className="config selectable"
+        ref={ref}
+        onClick={select}
+        title="Click to select"
+      >
+        {text}
+      </pre>
+      {failed && (
+        <p className="notice warn">
+          This browser won't let a page copy for you over plain HTTP (it needs
+          HTTPS). The text is selected — press <kbd>Ctrl</kbd>+<kbd>C</kbd> to
+          copy it.
+        </p>
+      )}
+      <button onClick={copy}>{copied ? "Copied" : label}</button>
+    </>
+  );
+}
+
 export default function TrainWizard({ onClose }) {
   const [step, setStep] = useState(1);
   const [phrase, setPhrase] = useState("");
   const [plan, setPlan] = useState(null);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [copyFailed, setCopyFailed] = useState(false);
-  const configRef = useRef(null);
   const upload = useStore((s) => s.upload);
   const busyWith = useStore((s) => s.busyWith);
 
@@ -31,30 +84,6 @@ export default function TrainWizard({ onClose }) {
     } catch (err) {
       setError(String(err.message || err));
     }
-  };
-
-  const copyConfig = async () => {
-    if (await copyText(plan.config)) {
-      setCopied(true);
-      setCopyFailed(false);
-      setTimeout(() => setCopied(false), 2000);
-      return;
-    }
-    // Last resort: select the text for them, so it is one keystroke away
-    // rather than a fiddly drag over two lines of code.
-    setCopyFailed(true);
-    selectConfig();
-  };
-
-  /** Put the two config lines under the user's selection. */
-  const selectConfig = () => {
-    const node = configRef.current;
-    if (!node || typeof window.getSelection !== "function") return;
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(node);
-    selection.removeAllRanges();
-    selection.addRange(range);
   };
 
   const onFile = async (event) => {
@@ -150,17 +179,24 @@ export default function TrainWizard({ onClose }) {
               in different voices.
             </p>
             <p>
-              The notebook opens already set to <strong>“{plan.phrase}”</strong>{" "}
-              and asks Colab for a GPU, so there is nothing to fill in. Choose{" "}
-              <strong>Runtime → Run all</strong> and leave the tab open — Colab
-              wipes everything if the session drops.
+              Take your phrase with you — the notebook's first cell asks for it:
+            </p>
+            <CopyBlock text={plan.phrase} label="Copy the phrase" />
+            <p>
+              In the notebook, choose <strong>Runtime → Run all</strong>. It
+              asks Colab for a GPU itself, so there is no runtime to pick. The
+              first cell stops with a <strong>Wake word:</strong> box — paste{" "}
+              <strong>“{plan.phrase}”</strong> in, press Enter, and the rest
+              runs unattended. Leave the tab open: Colab wipes everything if the
+              session drops.
             </p>
             <details className="troubleshoot">
               <summary>If something goes wrong</summary>
               <p className="hint">
-                The first cell should print <code>GPU present.</code> If it
-                stops there instead, your Google account has no GPU capacity
-                right now — wait a few hours, or use a ready-made wake word.
+                After the wake-word question it should print{" "}
+                <code>GPU present.</code> If it stops there instead, your Google
+                account has no GPU capacity right now — wait a few hours, or use
+                a ready-made wake word.
               </p>
               <p className="hint">
                 If you come back to{" "}
@@ -168,29 +204,11 @@ export default function TrainWizard({ onClose }) {
                 session was recycled and it has to start over.
               </p>
               <p className="hint">
-                Using a different copy of the notebook? Set the wake word by
-                hand in the cell marked{" "}
-                <strong>★ EDIT THESE TWO LINES ★</strong>:
+                Missed the question, or using a different copy of the notebook?
+                Overwrite these two lines in the cell that builds the training
+                config, then run the notebook from there:
               </p>
-              <pre
-                id="config"
-                className="config selectable"
-                ref={configRef}
-                onClick={selectConfig}
-                title="Click to select"
-              >
-                {plan.config}
-              </pre>
-              {copyFailed && (
-                <p className="notice warn">
-                  This browser won't let a page copy for you over plain HTTP (it
-                  needs HTTPS). The lines are selected — press <kbd>Ctrl</kbd>+
-                  <kbd>C</kbd> to copy them.
-                </p>
-              )}
-              <button onClick={copyConfig}>
-                {copied ? "Copied" : "Copy these lines"}
-              </button>
+              <CopyBlock text={plan.config} label="Copy these lines" />
             </details>
             <div className="row">
               <a

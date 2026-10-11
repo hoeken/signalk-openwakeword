@@ -18,10 +18,11 @@ Nothing to reconfigure — existing settings carry over unchanged.
   rejected instead of quietly mis-hearing you. Works on a Raspberry Pi.
 - **Guided wake word creation.** "Create a wake word" takes a phrase, tells
   you whether it will work well (short or everyday phrases false-trigger
-  constantly), fills in the training config, and hands you a link to the
-  notebook. Training itself runs on a free Google Colab GPU and takes about
-  an hour — it can't run on the Signal K server, and the wizard says so
-  plainly rather than pretending otherwise.
+  constantly), and hands you the notebook link plus your phrase ready to
+  paste. The notebook asks for the wake word in its first cell — one answer,
+  then it runs unattended. Training itself runs on a free Google Colab GPU
+  and takes about an hour — it can't run on the Signal K server, and the
+  wizard says so plainly rather than pretending otherwise.
 
 # v0.2.0
 
