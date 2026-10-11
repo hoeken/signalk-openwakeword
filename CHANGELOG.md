@@ -1,4 +1,4 @@
-# Unreleased
+# v0.3.0
 
 Nothing to reconfigure — existing settings carry over unchanged.
 
@@ -10,18 +10,52 @@ Nothing to reconfigure — existing settings carry over unchanged.
   advertise, and flags the two things that used to fail silently: a model
   sitting there while custom models are switched off, and a model that
   hasn't been converted yet.
+- **New models work immediately.** The wake word service only looks for
+  models when it starts, so a freshly added one used to stay invisible
+  until someone restarted the container by hand. Adding or deleting a model
+  now reloads the service for you.
+- **Clear about what the boat is actually listening for.** The service
+  loads every model it finds, but only the wake words you selected in the
+  plugin settings are listened for. The webapp now shows that difference —
+  "listening" versus "ready, not selected" — instead of calling every
+  loaded model "in use".
 - **ONNX models are converted for you.** The wake word service only loads
   `.tflite`, but every current training notebook produces `.onnx` — which
   is why so many trained models never worked. Drop the `.onnx` in and the
   plugin converts it on the server, then checks the result against the
   original before installing it, so a model that converted incorrectly is
-  rejected instead of quietly mis-hearing you. Works on a Raspberry Pi.
+  rejected instead of quietly mis-hearing you. Works on a Raspberry Pi, and
+  on servers where Signal K itself runs in a container.
 - **Guided wake word creation.** "Create a wake word" takes a phrase, tells
   you whether it will work well (short or everyday phrases false-trigger
-  constantly), fills in the training config, and hands you a link to the
-  notebook. Training itself runs on a free Google Colab GPU and takes about
-  an hour — it can't run on the Signal K server, and the wizard says so
-  plainly rather than pretending otherwise.
+  constantly), and hands you a link to the training notebook with your
+  phrase already filled in — nothing to copy or paste. Training runs on a
+  free Google Colab GPU, not the Signal K server, and takes roughly 75–90
+  minutes on Colab Pro and about twice that on the free tier. No microphone
+  is needed: the notebook generates its own training audio.
+- **A training notebook that finishes.** The community notebook failed
+  partway through in several ways, each costing the better part of an hour
+  before it surfaced. The plugin now links to its own maintained copy with
+  those fixes applied. It asks Colab for a GPU when it opens and stops in
+  the first cell if it didn't get one, rather than training on a CPU for
+  hours and being disconnected. The notebook link is an advanced setting,
+  so it can be repointed without waiting for a plugin release.
+- **Copy buttons work over plain HTTP.** Browsers only allow clipboard
+  access on HTTPS, but a boat's Signal K server is usually reached over
+  plain HTTP on the LAN — where the copy button did nothing. It now works
+  there too, and if the browser refuses outright, it selects the text so
+  you can press Ctrl+C.
+- **Satellites pick up your wake word automatically.** The plugin now tells
+  the signalk-wyoming orchestrator which wake words it is configured for,
+  so satellites that don't set their own no longer need the same wake word
+  entered a second time — previously a mismatch meant the satellite simply
+  never woke, with no error. The same list is reported on `/api/status`, so
+  devices that find the service over the REST API (such as ESP32
+  satellites) listen for your wake word instead of falling back to
+  `okay_nabu`.
+- **Recommended companions.** The Appstore now suggests signalk-wyoming,
+  signalk-piper, and signalk-whisper alongside this plugin, the rest of the
+  voice assistant family.
 
 # v0.2.0
 

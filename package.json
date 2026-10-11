@@ -1,6 +1,6 @@
 {
   "name": "signalk-openwakeword",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Wake word detection service for Signal K. Part of the signalk-wyoming voice assistant family.",
   "type": "module",
   "main": "dist/index.js",
